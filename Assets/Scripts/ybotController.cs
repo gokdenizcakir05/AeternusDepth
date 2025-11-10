@@ -14,6 +14,10 @@ public class ybotController : MonoBehaviour
     [Header("Ground Check Settings")]
     public float groundCheckDistance = 0.3f;
     public LayerMask groundLayer = 1;
+    public string[] groundTags = { "Ground", "NoSpawnGround", "Platform" }; // Tüm ground tag'leri
+
+    [Header("Debug")]
+    public bool showGroundDebug = false;
 
     private Animator ybotAnim;
     private Rigidbody rb;
@@ -33,6 +37,9 @@ public class ybotController : MonoBehaviour
 
         // Karakteri "Player" tag'i ile işaretle
         gameObject.tag = "Player";
+
+        if (showGroundDebug)
+            Debug.Log("ybotController: Ground detection aktif!");
     }
 
     private void Update()
@@ -62,15 +69,86 @@ public class ybotController : MonoBehaviour
 
     private void CheckGrounded()
     {
+        bool wasGrounded = isGrounded;
+        isGrounded = false;
+
+        // 1. Raycast ile ground kontrolü (mevcut sistem)
         RaycastHit hit;
         Vector3 rayStart = transform.position + Vector3.up * 0.1f;
-        bool wasGrounded = isGrounded;
 
-        isGrounded = Physics.Raycast(rayStart, Vector3.down, out hit, groundCheckDistance, groundLayer);
+        if (Physics.Raycast(rayStart, Vector3.down, out hit, groundCheckDistance, groundLayer))
+        {
+            // Tag kontrolü - tüm ground tag'lerini kabul et
+            if (IsValidGroundTag(hit.collider.tag))
+            {
+                isGrounded = true;
+            }
+        }
+
+        // 2. SphereCast ile daha geniş alan kontrolü (backup)
+        if (!isGrounded)
+        {
+            if (Physics.SphereCast(rayStart, 0.2f, Vector3.down, out hit, groundCheckDistance, groundLayer))
+            {
+                if (IsValidGroundTag(hit.collider.tag))
+                {
+                    isGrounded = true;
+                }
+            }
+        }
+
+        // 3. Collision-based ground kontrolü (ekstra güvenlik)
+        if (!isGrounded)
+        {
+            CheckGroundedByCollision();
+        }
 
         if (isGrounded && !wasGrounded)
         {
             isJumping = false;
+            if (showGroundDebug) Debug.Log("ybot: Grounded!");
+        }
+        else if (!isGrounded && wasGrounded)
+        {
+            if (showGroundDebug) Debug.Log("ybot: In Air!");
+        }
+    }
+
+    private bool IsValidGroundTag(string tag)
+    {
+        foreach (string validTag in groundTags)
+        {
+            if (tag == validTag)
+                return true;
+        }
+        return false;
+    }
+
+    private void CheckGroundedByCollision()
+    {
+        // Collision tabanlı ground kontrolü (physics-based)
+        Collider[] colliders = Physics.OverlapBox(
+            transform.position + Vector3.down * (groundCheckDistance * 0.5f),
+            new Vector3(0.3f, groundCheckDistance * 0.5f, 0.3f),
+            Quaternion.identity,
+            groundLayer
+        );
+
+        foreach (Collider col in colliders)
+        {
+            if (IsValidGroundTag(col.tag))
+            {
+                // Normal kontrolü - yukarı doğru yüzey mi?
+                RaycastHit normalHit;
+                if (Physics.Raycast(transform.position, Vector3.down, out normalHit, groundCheckDistance * 2f, groundLayer))
+                {
+                    if (Vector3.Dot(normalHit.normal, Vector3.up) > 0.7f) // 45 dereceden düz yüzey
+                    {
+                        isGrounded = true;
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -120,5 +198,30 @@ public class ybotController : MonoBehaviour
         ybotAnim.SetBool("isJumping", true);
         rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
+
+        if (showGroundDebug) Debug.Log("ybot: Jump!");
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        if (!showGroundDebug) return;
+
+        // Ground check görselleştirme
+        Gizmos.color = isGrounded ? Color.green : Color.red;
+
+        // Raycast çizgisi
+        Vector3 rayStart = transform.position + Vector3.up * 0.1f;
+        Gizmos.DrawRay(rayStart, Vector3.down * groundCheckDistance);
+
+        // SphereCast alanı
+        Gizmos.color = isGrounded ? new Color(0, 1, 0, 0.3f) : new Color(1, 0, 0, 0.3f);
+        Gizmos.DrawWireSphere(rayStart + Vector3.down * groundCheckDistance, 0.2f);
+
+        // OverlapBox alanı
+        Gizmos.color = Color.blue;
+        Gizmos.DrawWireCube(
+            transform.position + Vector3.down * (groundCheckDistance * 0.5f),
+            new Vector3(0.6f, groundCheckDistance, 0.6f)
+        );
     }
 }

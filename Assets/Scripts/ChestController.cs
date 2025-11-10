@@ -1,4 +1,5 @@
-using UnityEngine;
+ï»¿using UnityEngine;
+using System.Collections.Generic;
 
 public class ChestController : MonoBehaviour
 {
@@ -6,32 +7,35 @@ public class ChestController : MonoBehaviour
     public float interactionRange = 2f;
     public KeyCode interactKey = KeyCode.E;
 
+    [Header("Reward Settings")]
+    public GameObject[] rewardPrefabs;
+    [Range(1, 5)] public int minRewards = 1;
+    [Range(1, 5)] public int maxRewards = 3;
+    public float rewardSpawnRadius = 1.5f;
+
     [Header("Debug")]
     public bool showDebug = true;
-    public bool alwaysShowGizmos = true;
 
     private Transform player;
     private Animation chestAnimation;
     private bool canInteract = false;
     private bool isOpened = false;
+    private bool rewardsGiven = false;
 
     void Start()
     {
         player = GameObject.FindGameObjectWithTag("Player")?.transform;
         chestAnimation = GetComponent<Animation>();
 
-        if (showDebug && player == null)
-            Debug.LogError("Chest: Player bulunamadý! Player'ýn 'Player' tag'i olduðundan emin olun.");
-
-        if (showDebug && chestAnimation == null)
-            Debug.LogError("Chest: Animation component'i bulunamadý!");
-        else if (showDebug)
+        // RIGIDBODY AYARLARI - KESÄ°N Ã‡Ã–ZÃœM
+        Rigidbody rb = GetComponent<Rigidbody>();
+        if (rb != null)
         {
-            foreach (AnimationState state in chestAnimation)
-            {
-                Debug.Log($"Mevcut animasyon: {state.name}");
-            }
+            rb.isKinematic = true; // Fizik etkisiz
         }
+
+        if (showDebug && player == null)
+            Debug.LogError("Chest: Player bulunamadÄ±!");
     }
 
     void Update()
@@ -51,74 +55,62 @@ public class ChestController : MonoBehaviour
     {
         if (isOpened) return;
 
+        isOpened = true;
+
         if (chestAnimation != null)
         {
-            // Tüm animasyonlarý durdur ve hemen open animasyonunu son karesine al
-            chestAnimation.Stop();
-
-            // "open" animasyonunu bul ve hemen son karesine al
             foreach (AnimationState state in chestAnimation)
             {
                 if (state.name.ToLower().Contains("open"))
                 {
-                    // Animasyonu son karesine al ve oynat
-                    state.time = state.length; // Son kareye git
-                    state.speed = 0; // Oynatma hýzýný sýfýrla (duraðan kalsýn)
                     chestAnimation.Play(state.name);
-
-                    isOpened = true;
-                    if (showDebug) Debug.Log("Chest anýnda açýldý: " + state.name);
-                    OnChestOpened();
-                    return;
+                    break;
                 }
             }
-
-            // Eðer "open" bulunamazsa, element 1'i kullan
-            int index = 0;
-            foreach (AnimationState state in chestAnimation)
-            {
-                if (index == 1) // Element 1 (open)
-                {
-                    state.time = state.length;
-                    state.speed = 0;
-                    chestAnimation.Play(state.name);
-
-                    isOpened = true;
-                    if (showDebug) Debug.Log("Chest anýnda açýldý (element 1): " + state.name);
-                    OnChestOpened();
-                    return;
-                }
-                index++;
-            }
-
-            Debug.LogError("Open animasyonu bulunamadý!");
         }
+
+        if (!rewardsGiven)
+        {
+            GiveRewards();
+            rewardsGiven = true;
+        }
+
+        if (showDebug) Debug.Log("Chest aÃ§Ä±ldÄ±!");
     }
 
-    void OnChestOpened()
+    void GiveRewards()
     {
-        // Chest açýldýðýnda yapýlacak iþlemler
-        Debug.Log("Chest anýnda açýldý! Ödül verilebilir.");
+        if (rewardPrefabs == null || rewardPrefabs.Length == 0)
+        {
+            Debug.LogWarning("Chest: Ã–dÃ¼l prefab'Ä± atanmamÄ±ÅŸ!");
+            return;
+        }
+
+        int rewardCount = Random.Range(minRewards, maxRewards + 1);
+
+        for (int i = 0; i < rewardCount; i++)
+        {
+            GameObject rewardPrefab = rewardPrefabs[Random.Range(0, rewardPrefabs.Length)];
+
+            if (rewardPrefab != null)
+            {
+                Vector3 randomOffset = Random.insideUnitSphere * rewardSpawnRadius;
+                randomOffset.y = 0;
+                Vector3 spawnPosition = transform.position + randomOffset;
+
+                Instantiate(rewardPrefab, spawnPosition, Quaternion.identity);
+            }
+        }
+
+        if (showDebug) Debug.Log($"Chest Ã¶dÃ¼lÃ¼ verildi: {rewardCount} adet");
     }
 
-    // Gizmos ile etkileþim alanýný göster
-    void OnDrawGizmos()
+    // GIZMOS'LARI BASÄ°TLEÅžTÄ°R
+    void OnDrawGizmosSelected()
     {
-        if (!alwaysShowGizmos && !showDebug) return;
+        if (!showDebug) return;
 
-        // Etkileþim alaný
         Gizmos.color = canInteract ? Color.green : Color.yellow;
         Gizmos.DrawWireSphere(transform.position, interactionRange);
-
-        // Player'a olan baðlantýyý göster
-        if (canInteract && player != null)
-        {
-            Gizmos.color = Color.blue;
-            Gizmos.DrawLine(transform.position, player.position);
-        }
-
-        // Chest durumunu göster
-        Gizmos.color = isOpened ? Color.red : Color.white;
-        Gizmos.DrawWireCube(transform.position, Vector3.one * 1.2f);
     }
 }
