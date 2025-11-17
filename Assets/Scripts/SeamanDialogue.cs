@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.Events;
 using TMPro;
-using UnityEngine.UI; // YENİ: Image için
+using UnityEngine.UI;
 
 public class SeamanDialogue : MonoBehaviour
 {
@@ -14,15 +14,19 @@ public class SeamanDialogue : MonoBehaviour
     public GameObject dialoguePanel;
     public TextMeshProUGUI dialogueText;
     public TextMeshProUGUI continuePrompt;
-    public Image characterImage; // YENİ: Karakter resmi
+    public Image characterImage;
 
     [Header("Character Sprites")]
     public Sprite normalSprite;
-    public Sprite talkingSprite; // YENİ: Konuşma sprite'ı
+    public Sprite talkingSprite;
 
     [Header("Events")]
     public UnityEvent onDialogueStart;
     public UnityEvent onDialogueEnd;
+
+    [Header("Other UI Elements to Hide")]
+    public HealthBarUI healthBarUI; // Can barı referansı
+    public GameTimer gameTimer; // Zaman sayacı referansı
 
     [Header("Visual Feedback")]
     public GameObject interactionPrompt;
@@ -38,6 +42,11 @@ public class SeamanDialogue : MonoBehaviour
     private float timer = 0f;
     private bool isTyping = false;
 
+    // YENİ: Oyun durdurma için
+    private float previousTimeScale;
+    private bool wasCursorVisible;
+    private CursorLockMode previousCursorLockState;
+
     void Start()
     {
         // UI'ı başlangıçta kapat
@@ -49,6 +58,26 @@ public class SeamanDialogue : MonoBehaviour
 
         if (continuePrompt != null)
             continuePrompt.gameObject.SetActive(false);
+
+        // Referansları otomatik bul
+        FindUIReferences();
+    }
+
+    void FindUIReferences()
+    {
+        // HealthBarUI'ı bul
+        if (healthBarUI == null)
+            healthBarUI = FindObjectOfType<HealthBarUI>();
+
+        // GameTimer'ı bul
+        if (gameTimer == null)
+            gameTimer = FindObjectOfType<GameTimer>();
+
+        if (showDebug)
+        {
+            if (healthBarUI != null) Debug.Log("✅ HealthBarUI bulundu!");
+            if (gameTimer != null) Debug.Log("✅ GameTimer bulundu!");
+        }
     }
 
     void Update()
@@ -70,6 +99,9 @@ public class SeamanDialogue : MonoBehaviour
         isDialogueActive = true;
         currentLine = 0;
 
+        // YENİ: OYUNU DURDUR
+        PauseGame();
+
         // UI'ı aç
         if (dialoguePanel != null)
             dialoguePanel.SetActive(true);
@@ -80,7 +112,7 @@ public class SeamanDialogue : MonoBehaviour
         if (continuePrompt != null)
             continuePrompt.gameObject.SetActive(true);
 
-        // YENİ: Karakter resmini ayarla
+        // Karakter resmini ayarla
         if (characterImage != null && talkingSprite != null)
             characterImage.sprite = talkingSprite;
 
@@ -88,13 +120,124 @@ public class SeamanDialogue : MonoBehaviour
         if (talkParticles != null && !talkParticles.isPlaying)
             talkParticles.Play();
 
+        // CAN BARINI GİZLE
+        if (healthBarUI != null)
+        {
+            CanvasGroup healthBarCanvas = healthBarUI.GetComponent<CanvasGroup>();
+            if (healthBarCanvas != null)
+            {
+                healthBarCanvas.alpha = 0f;
+            }
+        }
+
+        // ZAMANI DURDUR
+        if (gameTimer != null)
+        {
+            gameTimer.PauseTimer();
+        }
+
         // Event tetikle
         onDialogueStart?.Invoke();
 
         // İlk satırı başlat
         StartTypingLine(dialogueLines[currentLine]);
 
-        if (showDebug) Debug.Log("💬 Diyalog başladı!");
+        if (showDebug) Debug.Log("💬 Diyalog başladı! - Oyun durduruldu");
+    }
+
+    // YENİ: OYUNU DURDURMA METODU
+    void PauseGame()
+    {
+        // Zamanı durdur
+        previousTimeScale = Time.timeScale;
+        Time.timeScale = 0f;
+
+        // Fareyi serbest bırak
+        wasCursorVisible = Cursor.visible;
+        previousCursorLockState = Cursor.lockState;
+
+        Cursor.visible = true;
+        Cursor.lockState = CursorLockMode.None;
+
+        // Player hareketini durdur
+        DisablePlayerMovement();
+    }
+
+    // YENİ: OYUNU DEVAM ETTİRME METODU
+    void ResumeGame()
+    {
+        // Zamanı normale döndür
+        Time.timeScale = previousTimeScale;
+
+        // Fareyi eski haline getir
+        Cursor.visible = wasCursorVisible;
+        Cursor.lockState = previousCursorLockState;
+
+        // Player hareketini etkinleştir
+        EnablePlayerMovement();
+    }
+
+    // YENİ: PLAYER HAREKETİNİ DURDUR
+    void DisablePlayerMovement()
+    {
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player != null)
+        {
+            // FirstPersonController varsa
+            MonoBehaviour fpsController = player.GetComponent<MonoBehaviour>();
+            if (fpsController != null && fpsController.GetType().Name.Contains("FirstPersonController"))
+            {
+                fpsController.enabled = false;
+            }
+
+            // CharacterController varsa
+            CharacterController characterController = player.GetComponent<CharacterController>();
+            if (characterController != null)
+            {
+                characterController.enabled = false;
+            }
+
+            // Rigidbody varsa
+            Rigidbody rb = player.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.linearVelocity = Vector3.zero;
+                rb.isKinematic = true;
+            }
+
+            if (showDebug) Debug.Log("🚫 Player hareketi durduruldu");
+        }
+    }
+
+    // YENİ: PLAYER HAREKETİNİ ETKİNLEŞTİR
+    void EnablePlayerMovement()
+    {
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player != null)
+        {
+            // FirstPersonController varsa
+            MonoBehaviour fpsController = player.GetComponent<MonoBehaviour>();
+            if (fpsController != null && fpsController.GetType().Name.Contains("FirstPersonController"))
+            {
+                fpsController.enabled = true;
+            }
+
+            // CharacterController varsa
+            CharacterController characterController = player.GetComponent<CharacterController>();
+            if (characterController != null)
+            {
+                characterController.enabled = true;
+            }
+
+            // Rigidbody varsa
+            Rigidbody rb = player.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.isKinematic = false;
+            }
+
+            if (showDebug) Debug.Log("✅ Player hareketi etkinleştirildi");
+        }
     }
 
     void StartTypingLine(string line)
@@ -111,7 +254,7 @@ public class SeamanDialogue : MonoBehaviour
     {
         if (!isTyping) return;
 
-        timer += Time.deltaTime;
+        timer += Time.unscaledDeltaTime; // TimeScale = 0 olduğu için unscaledDeltaTime kullan
 
         if (timer >= dialogueSpeed)
         {
@@ -176,6 +319,9 @@ public class SeamanDialogue : MonoBehaviour
     {
         isDialogueActive = false;
 
+        // YENİ: OYUNU DEVAM ETTİR
+        ResumeGame();
+
         // UI'ı kapat
         if (dialoguePanel != null)
             dialoguePanel.SetActive(false);
@@ -183,7 +329,7 @@ public class SeamanDialogue : MonoBehaviour
         if (continuePrompt != null)
             continuePrompt.gameObject.SetActive(false);
 
-        // YENİ: Karakter resmini normale döndür
+        // Karakter resmini normale döndür
         if (characterImage != null && normalSprite != null)
             characterImage.sprite = normalSprite;
 
@@ -191,10 +337,26 @@ public class SeamanDialogue : MonoBehaviour
         if (talkParticles != null && talkParticles.isPlaying)
             talkParticles.Stop();
 
+        // CAN BARINI GÖSTER
+        if (healthBarUI != null)
+        {
+            CanvasGroup healthBarCanvas = healthBarUI.GetComponent<CanvasGroup>();
+            if (healthBarCanvas != null)
+            {
+                healthBarCanvas.alpha = 1f;
+            }
+        }
+
+        // ZAMANI DEVAM ETTİR
+        if (gameTimer != null)
+        {
+            gameTimer.ResumeTimer();
+        }
+
         // Event tetikle
         onDialogueEnd?.Invoke();
 
-        if (showDebug) Debug.Log("💬 Diyalog bitti!");
+        if (showDebug) Debug.Log("💬 Diyalog bitti! - Oyun devam ediyor");
     }
 
     void OnTriggerEnter(Collider other)

@@ -161,6 +161,17 @@ MonoBehaviour:
   moveSpeed: 2
   rotationLerpSpeed: 5
   frontPoint: {fileID: 7987345369091111128}
+  enableTrailMounds: 1
+  moundPrefab: {fileID: 3776431465391705897, guid: 5a9dd3bbff0b4ea499308840613b142e, type: 3}
+  moundSpawnInterval: 2
+  moundDetectionRadius: 1.5
+  moundLifetime: 4
+  moundDamage: 4
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 8
+  playerSearchInterval: 0.3
+  distanceCheckInterval: 0.1
   showDebug: 0
   alwaysShowGizmos: 1
 --- !u!135 &6710056434542357459

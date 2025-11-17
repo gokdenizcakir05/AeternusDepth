@@ -12,11 +12,24 @@ public class JellySlime : MonoBehaviour
     public float rotationLerpSpeed = 5f;
 
     [Header("Face Direction")]
-    public Transform frontPoint; // �n taraf� belirleyen GameObject
+    public Transform frontPoint;
+
+    [Header("Player Trail Mound Settings")]
+    public bool enableTrailMounds = true;
+    public GameObject moundPrefab;
+    public float moundSpawnInterval = 3f;
+    public float moundDetectionRadius = 1.5f;
+    public float moundLifetime = 5f;
+    public int moundDamage = 10;
+    public LayerMask groundLayer = 1;
+
+    [Header("Optimization Settings")]
+    public float playerSearchInterval = 0.3f;
+    public float distanceCheckInterval = 0.1f;
 
     [Header("Debug")]
     public bool showDebug = false;
-    public bool alwaysShowGizmos = true; // Yeni: Her zaman gizmos g�ster
+    public bool alwaysShowGizmos = true;
 
     private Vector3 originalScale;
     private Vector3 startPosition;
@@ -24,6 +37,13 @@ public class JellySlime : MonoBehaviour
     private Transform player;
     private bool isFollowing = false;
     private Rigidbody rb;
+    private float lastMoundSpawnTime;
+    private Vector3 lastPlayerPosition;
+    private float playerMoveThreshold = 0.5f;
+
+    private float lastPlayerSearchTime;
+    private float lastDistanceCheckTime;
+    private float currentDistanceToPlayer;
 
     void Start()
     {
@@ -31,94 +51,101 @@ public class JellySlime : MonoBehaviour
         startPosition = transform.position;
         timeOffset = Random.Range(0f, 100f);
 
-        // Rigidbody yoksa ekle, varsa al
         rb = GetComponent<Rigidbody>();
         if (rb == null)
         {
             rb = gameObject.AddComponent<Rigidbody>();
         }
 
-        // Rigidbody ayarlar�n� yap
         rb.useGravity = true;
         rb.constraints = RigidbodyConstraints.FreezeRotation;
-        rb.linearDamping = 2f; // linearDamping yerine drag
-        rb.angularDamping = 2f; // angularDamping yerine angularDrag
+        rb.linearDamping = 2f;
+        rb.angularDamping = 2f;
 
-        // Player'� bul
         FindPlayer();
+        lastMoundSpawnTime = Time.time;
+        lastPlayerSearchTime = Time.time;
+        lastDistanceCheckTime = Time.time;
 
-        if (showDebug && player == null)
-            Debug.LogError("Slime: Player bulunamad�! Player'�n 'Player' tag'i oldu�undan emin olun.");
-
-        if (showDebug && frontPoint == null)
-            Debug.LogWarning("Slime: FrontPoint atanmam��! Slime'�n �n y�n� transform.forward olarak kullan�lacak.");
+        if (player != null)
+        {
+            lastPlayerPosition = player.position;
+            currentDistanceToPlayer = Vector3.Distance(transform.position, player.position);
+        }
     }
 
     void Update()
     {
-        // Player yoksa bulmaya �al��
-        if (player == null)
+        if (Time.time - lastPlayerSearchTime >= playerSearchInterval)
         {
-            FindPlayer();
             if (player == null)
             {
-                NormalAnimation();
-                return;
+                FindPlayer();
+                if (player == null)
+                {
+                    NormalAnimation();
+                    lastPlayerSearchTime = Time.time;
+                    return;
+                }
+                else
+                {
+                    lastPlayerPosition = player.position;
+                    currentDistanceToPlayer = Vector3.Distance(transform.position, player.position);
+                }
             }
+            lastPlayerSearchTime = Time.time;
         }
 
-        float distanceToPlayer = Vector3.Distance(transform.position, player.position);
+        if (player != null && Time.time - lastDistanceCheckTime >= distanceCheckInterval)
+        {
+            currentDistanceToPlayer = Vector3.Distance(transform.position, player.position);
+            lastDistanceCheckTime = Time.time;
+        }
 
-        // Player takip menzilindeyse takip et
-        if (!isFollowing && distanceToPlayer <= detectionRange)
+        if (!isFollowing && currentDistanceToPlayer <= detectionRange)
         {
             isFollowing = true;
-            if (showDebug) Debug.Log("Slime: Player takip ba�lad�!");
+            if (showDebug) Debug.Log("Slime: Player takip başladı!");
         }
 
-        // Takip ediyorsa player'a do�ru hareket et
         if (isFollowing)
         {
             FollowPlayer();
+
+            if (enableTrailMounds && Time.time - lastMoundSpawnTime >= moundSpawnInterval)
+            {
+                TrySpawnMoundAtPlayerPosition();
+                lastMoundSpawnTime = Time.time;
+            }
         }
         else
         {
             NormalAnimation();
         }
 
-        // Her durumda bounce animasyonu uygula
         ApplyBounceAnimation();
     }
 
+    // DÜZELTİLDİ: PlayerMovement referansı kaldırıldı
     void FindPlayer()
     {
         GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
         if (playerObj != null)
         {
             player = playerObj.transform;
+            lastPlayerPosition = player.position;
+            return;
         }
-    }
 
-    void NormalAnimation()
-    {
-        float time = Time.time + timeOffset;
-
-        // Z�plama efekti (sadece Y pozisyonunda)
-        float jump = Mathf.Abs(Mathf.Sin(time * jumpFrequency)) * jumpHeight;
-        Vector3 newPosition = new Vector3(
-            transform.position.x,
-            startPosition.y + jump,
-            transform.position.z
-        );
-
-        // Rigidbody ile hareket
-        if (rb != null)
+        // Fallback: Sadece isimle ara (PlayerMovement olmadan)
+        if (player == null)
         {
-            rb.MovePosition(newPosition);
-        }
-        else
-        {
-            transform.position = newPosition;
+            playerObj = GameObject.Find("Player");
+            if (playerObj != null)
+            {
+                player = playerObj.transform;
+                lastPlayerPosition = player.position;
+            }
         }
     }
 
@@ -126,28 +153,23 @@ public class JellySlime : MonoBehaviour
     {
         if (player == null) return;
 
-        // Slime'�n �n y�n�n� hesapla
         Vector3 slimeForward = GetSlimeForward();
-
-        // Player'a do�ru y�nel
         Vector3 directionToPlayer = (player.position - transform.position).normalized;
-        directionToPlayer.y = 0f; // Y eksenini s�f�rla
+        directionToPlayer.y = 0f;
 
         if (directionToPlayer != Vector3.zero)
         {
-            // Mevcut �n y�n ile player y�n� aras�ndaki a��y� hesapla
             float angle = Vector3.SignedAngle(slimeForward, directionToPlayer, Vector3.up);
-
-            // A��ya g�re d�n�� uygula
-            transform.Rotate(0f, angle * rotationLerpSpeed * Time.deltaTime, 0f, Space.World);
+            float rotationAmount = Mathf.Clamp(angle * rotationLerpSpeed * Time.deltaTime, -180f, 180f);
+            transform.Rotate(0f, rotationAmount, 0f, Space.World);
         }
 
-        // Slime'�n �n y�n�ne g�re hareket et
         Vector3 moveDirection = GetSlimeForward();
 
         if (rb != null)
         {
-            rb.linearVelocity = new Vector3(moveDirection.x * moveSpeed, rb.linearVelocity.y, moveDirection.z * moveSpeed);
+            Vector3 targetVelocity = new Vector3(moveDirection.x * moveSpeed, rb.linearVelocity.y, moveDirection.z * moveSpeed);
+            rb.linearVelocity = Vector3.Lerp(rb.linearVelocity, targetVelocity, Time.deltaTime * 5f);
         }
         else
         {
@@ -155,13 +177,75 @@ public class JellySlime : MonoBehaviour
         }
     }
 
+    void TrySpawnMoundAtPlayerPosition()
+    {
+        if (moundPrefab == null || player == null) return;
+
+        float playerMoveDistance = Vector3.Distance(player.position, lastPlayerPosition);
+        if (playerMoveDistance < playerMoveThreshold) return;
+
+        Vector3 spawnPosition = GetPlayerGroundPosition();
+        if (!IsValidSpawnPosition(spawnPosition)) return;
+        if (IsPositionOccupied(spawnPosition)) return;
+
+        SpawnMoundAtPosition(spawnPosition);
+        lastPlayerPosition = player.position;
+    }
+
+    Vector3 GetPlayerGroundPosition()
+    {
+        Vector3 playerPos = player.position;
+
+        RaycastHit hit;
+        if (Physics.Raycast(playerPos + Vector3.up * 1f, Vector3.down, out hit, 3f, groundLayer))
+        {
+            return hit.point + Vector3.up * 0.1f;
+        }
+
+        return new Vector3(playerPos.x, playerPos.y - 0.5f, playerPos.z);
+    }
+
+    void SpawnMoundAtPosition(Vector3 position)
+    {
+        GameObject mound = Instantiate(moundPrefab, position, Quaternion.identity);
+        DamageMound moundScript = mound.GetComponent<DamageMound>();
+        if (moundScript == null)
+        {
+            moundScript = mound.AddComponent<DamageMound>();
+        }
+        moundScript.SetupMound(moundDamage, moundLifetime, moundDetectionRadius);
+    }
+
+    bool IsPositionOccupied(Vector3 position)
+    {
+        Collider[] colliders = Physics.OverlapSphere(position, 0.3f);
+        foreach (Collider collider in colliders)
+        {
+            if (collider.GetComponent<DamageMound>() != null) return true;
+        }
+        return false;
+    }
+
+    bool IsValidSpawnPosition(Vector3 position)
+    {
+        if (!Physics.Raycast(position + Vector3.up * 0.5f, Vector3.down, 1.5f, groundLayer)) return false;
+        if (Vector3.Distance(position, transform.position) > detectionRange * 1.5f) return false;
+        return true;
+    }
+
+    void NormalAnimation()
+    {
+        float time = Time.time + timeOffset;
+        float jump = Mathf.Abs(Mathf.Sin(time * jumpFrequency)) * jumpHeight;
+        Vector3 newPosition = new Vector3(transform.position.x, startPosition.y + jump, transform.position.z);
+
+        if (rb != null) rb.MovePosition(newPosition);
+        else transform.position = newPosition;
+    }
+
     Vector3 GetSlimeForward()
     {
-        // FrontPoint varsa onun y�n�n� kullan, yoksa normal forward'u kullan
-        if (frontPoint != null)
-        {
-            return (frontPoint.position - transform.position).normalized;
-        }
+        if (frontPoint != null) return (frontPoint.position - transform.position).normalized;
         return transform.forward;
     }
 
@@ -169,47 +253,30 @@ public class JellySlime : MonoBehaviour
     {
         float time = Time.time + timeOffset;
         float bounce = Mathf.Sin(time * bounceSpeed) * bounceAmount;
-        transform.localScale = new Vector3(
-            originalScale.x - bounce * 0.5f,
-            originalScale.y + bounce,
-            originalScale.z - bounce * 0.5f
-        );
+        transform.localScale = new Vector3(originalScale.x - bounce * 0.5f, originalScale.y + bounce, originalScale.z - bounce * 0.5f);
     }
 
-    // �arp��ma tespiti
     void OnCollisionEnter(Collision collision)
     {
         if (collision.gameObject.CompareTag("Player"))
         {
-            if (showDebug) Debug.Log("Slime: Player'a �arpt�!");
-
-            // �arpma sonras� hareketi durdur
+            if (showDebug) Debug.Log("Slime: Player'a çarptı!");
             isFollowing = false;
-
-            // Rigidbody h�z�n� s�f�rla
-            if (rb != null)
-            {
-                rb.linearVelocity = Vector3.zero;
-                rb.angularVelocity = Vector3.zero;
-            }
+            if (rb != null) rb.linearVelocity = Vector3.zero;
         }
     }
 
-    // Gizmos - HER ZAMAN g�ster (se�ili olmasa bile)
     void OnDrawGizmos()
     {
         if (!alwaysShowGizmos && !showDebug) return;
 
-        // Alg�lama alan�
         Gizmos.color = isFollowing ? Color.red : Color.yellow;
         Gizmos.DrawWireSphere(transform.position, detectionRange);
 
-        // Slime'�n �n y�n�n� g�ster
         Vector3 faceDirection = GetSlimeForward();
         Gizmos.color = Color.blue;
         Gizmos.DrawLine(transform.position, transform.position + faceDirection * 2f);
 
-        // FrontPoint'i g�ster
         if (frontPoint != null)
         {
             Gizmos.color = Color.green;
@@ -217,36 +284,10 @@ public class JellySlime : MonoBehaviour
             Gizmos.DrawLine(transform.position, frontPoint.position);
         }
 
-        // Player'a olan y�n� g�ster
         if (isFollowing && player != null)
         {
             Gizmos.color = Color.magenta;
             Gizmos.DrawLine(transform.position, player.position);
-        }
-    }
-
-    // Se�ildi�inde daha kal�n �izgilerle g�ster
-    void OnDrawGizmosSelected()
-    {
-        if (!showDebug) return;
-
-        // Daha kal�n �izgiler i�in iki kez �iz
-        Gizmos.color = isFollowing ? Color.red : Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, detectionRange);
-        Gizmos.DrawWireSphere(transform.position, detectionRange);
-
-        Vector3 faceDirection = GetSlimeForward();
-        Gizmos.color = Color.blue;
-        Gizmos.DrawLine(transform.position, transform.position + faceDirection * 2f);
-        Gizmos.DrawLine(transform.position, transform.position + faceDirection * 2f);
-
-        if (frontPoint != null)
-        {
-            Gizmos.color = Color.green;
-            Gizmos.DrawWireSphere(frontPoint.position, 0.1f);
-            Gizmos.DrawWireSphere(frontPoint.position, 0.1f);
-            Gizmos.DrawLine(transform.position, frontPoint.position);
-            Gizmos.DrawLine(transform.position, frontPoint.position);
         }
     }
 }

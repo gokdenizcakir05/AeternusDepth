@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 3842951982661915205}
   - component: {fileID: 101025010656896772}
   - component: {fileID: 5991801912363755596}
+  - component: {fileID: -5425633839836161656}
   - component: {fileID: 5796069485666832691}
   - component: {fileID: 7506065581329187681}
   m_Layer: 0
@@ -91,6 +92,33 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!54 &-5425633839836161656
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5971383330729671172}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 4
+  m_CollisionDetection: 0
 --- !u!135 &5796069485666832691
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -125,10 +153,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AutoBullet
   damage: 10
-  bulletSpeed: 25
-  bulletLifetime: 2
+  bulletSpeed: 15
+  bulletLifetime: 1
   hitEffect: {fileID: 0}
   knockbackForce: 15
-  bulletMesh: {fileID: 0}
-  bulletMaterial: {fileID: 0}
-  bulletSize: 0.1

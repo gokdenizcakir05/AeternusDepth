@@ -14,7 +14,6 @@ public class SeahorseController : MonoBehaviour
     [Header("Bubble Effects")]
     public GameObject bubbleParticlePrefab;
     public float bubbleEmissionRate = 10f;
-    public float minBubbleSpeed = 0.3f;
 
     [Header("Ground Settings")]
     public LayerMask groundLayer = 1;
@@ -22,6 +21,19 @@ public class SeahorseController : MonoBehaviour
 
     [Header("Knockback Settings")]
     public float knockbackStrength = 3f;
+
+    [Header("Baby Seahorse Attack")]
+    public GameObject babySeahorsePrefab;
+    public float attackRange = 4f;
+    public float attackCooldown = 3f;
+    public int babiesPerAttack = 3;
+    public float babySpeed = 8f;
+    public int babyDamage = 5;
+    public float babyLifetime = 4f;
+
+    [Header("Collision Settings")]
+    public LayerMask obstacleLayers = 1;
+    public float obstacleCheckDistance = 1f;
 
     [Header("Debug")]
     public bool showDebug = true;
@@ -32,110 +44,74 @@ public class SeahorseController : MonoBehaviour
     private bool isMoving = false;
     private ParticleSystem bubbleParticleSystem;
     private ParticleSystem.EmissionModule emissionModule;
-    private float characterHeight;
-    private Collider seahorseCollider; // Sadece referans
+    private Collider seahorseCollider;
+    private Rigidbody rb;
 
     // KNOCKBACK SİSTEMİ
     private Vector3 knockbackVelocity;
     private float knockbackDecay = 4f;
 
+    // SALDIRI SİSTEMİ
+    private bool canAttack = true;
+    private bool isInAttackRange = false;
+
     void Start()
     {
-        // Collider referansını al (zaten inspector'da var)
         seahorseCollider = GetComponent<Collider>();
 
-        CalculateCharacterHeight();
-        FixGroundPosition(); // BU METODU GÜNCELLEDİM
+        // DÜZELTME: Dungeon için gravity AÇIK
+        rb = GetComponent<Rigidbody>();
+        if (rb == null)
+        {
+            rb = gameObject.AddComponent<Rigidbody>();
+        }
+
+        // Dungeon ayarları
+        rb.useGravity = true; // ✅ DUNGEON İÇİN GRAVITY AÇIK
+        rb.constraints = RigidbodyConstraints.FreezeRotation;
+        rb.linearDamping = 1f;
+        rb.angularDamping = 1f;
+
+        FixGroundPosition();
         FindPlayer();
         InitializeBubbleSystem();
 
-        if (showDebug && player == null)
-            Debug.LogError("Seahorse: Player bulunamadı!");
-    }
-
-    void CalculateCharacterHeight()
-    {
-        Renderer renderer = GetComponent<Renderer>();
-        if (renderer != null)
+        if (showDebug)
         {
-            characterHeight = renderer.bounds.size.y;
-            if (showDebug) Debug.Log($"Denizatı yüksekliği: {characterHeight}");
-        }
-        else
-        {
-            characterHeight = 1f;
-            if (showDebug) Debug.Log("Renderer bulunamadı, varsayılan yükseklik kullanılıyor");
+            if (player == null) Debug.LogError("Seahorse: Player bulunamadı!");
+            if (babySeahorsePrefab == null) Debug.LogError("Seahorse: BabySeahorsePrefab atanmamış!");
         }
     }
 
     void FixGroundPosition()
     {
-        if (seahorseCollider == null)
-        {
-            if (showDebug) Debug.LogError("Collider bulunamadı!");
-            return;
-        }
-
-        // Collider'ın bounds'ını al
-        Bounds colliderBounds = seahorseCollider.bounds;
-        float colliderBottomY = colliderBounds.min.y;
-        float colliderHeight = colliderBounds.size.y;
+        if (seahorseCollider == null) return;
 
         RaycastHit hit;
         Vector3 rayStart = transform.position + Vector3.up * 2f;
 
         if (Physics.Raycast(rayStart, Vector3.down, out hit, 10f, groundLayer))
         {
-            // Collider'ın en altı zemine değecek şekilde ayarla
+            Bounds colliderBounds = seahorseCollider.bounds;
+            float colliderBottomY = colliderBounds.min.y;
             float targetY = hit.point.y - colliderBottomY + transform.position.y + groundOffset;
             transform.position = new Vector3(transform.position.x, targetY, transform.position.z);
-
-            if (showDebug)
-            {
-                Debug.Log($"✅ Denizatı zemine yerleştirildi!");
-                Debug.Log($"- Collider Bottom: {colliderBottomY}");
-                Debug.Log($"- Hit Point: {hit.point.y}");
-                Debug.Log($"- Target Y: {targetY}");
-            }
-        }
-        else
-        {
-            if (showDebug)
-                Debug.LogWarning("Denizatı: Ground bulunamadı!");
-
-            // Collider'ın altını zemin seviyesine getir
-            transform.position = new Vector3(transform.position.x, -colliderBottomY + groundOffset, transform.position.z);
         }
     }
 
     void InitializeBubbleSystem()
     {
-        if (bubbleParticlePrefab == null)
-        {
-            Debug.LogError("❌ BUBBLE PARTICLE PREFAB ATANMAMIŞ!");
-            return;
-        }
+        if (bubbleParticlePrefab == null) return;
 
         GameObject bubbleInstance = Instantiate(bubbleParticlePrefab, transform.position, Quaternion.identity);
         bubbleInstance.transform.SetParent(transform);
-        bubbleInstance.name = "BubbleParticles";
-
         bubbleParticleSystem = bubbleInstance.GetComponent<ParticleSystem>();
 
-        if (bubbleParticleSystem == null)
+        if (bubbleParticleSystem != null)
         {
-            Debug.LogError("❌ PREFAB'DA PARTICLE SYSTEM COMPONENT'I YOK!");
-            return;
-        }
-
-        emissionModule = bubbleParticleSystem.emission;
-        emissionModule.rateOverTime = 0;
-
-        bubbleParticleSystem.Play();
-
-        if (showDebug)
-        {
-            Debug.Log($"✅ Bubble Particle System oluşturuldu!");
+            emissionModule = bubbleParticleSystem.emission;
+            emissionModule.rateOverTime = 0;
+            bubbleParticleSystem.Play();
         }
     }
 
@@ -159,12 +135,23 @@ public class SeahorseController : MonoBehaviour
 
         float distanceToPlayer = Vector3.Distance(transform.position, player.position);
 
+        // TAKİP KONTROLÜ
         if (!isFollowing && distanceToPlayer <= detectionRange)
         {
             isFollowing = true;
             if (showDebug) Debug.Log("Seahorse: Player takip başladı!");
         }
 
+        // SALDIRI MENZİLİ KONTROLÜ
+        isInAttackRange = distanceToPlayer <= attackRange;
+
+        // SALDIRI KONTROLÜ
+        if (isInAttackRange && canAttack && babySeahorsePrefab != null)
+        {
+            StartCoroutine(PerformAttack());
+        }
+
+        // HAREKET KONTROLÜ
         if (isFollowing)
         {
             FollowPlayer();
@@ -179,11 +166,6 @@ public class SeahorseController : MonoBehaviour
         if (playerObj != null)
         {
             player = playerObj.transform;
-            if (showDebug) Debug.Log($"Player bulundu: {player.name}");
-        }
-        else
-        {
-            if (showDebug) Debug.LogWarning("Player objesi bulunamadı!");
         }
     }
 
@@ -201,22 +183,65 @@ public class SeahorseController : MonoBehaviour
             transform.Rotate(0f, angle * rotationLerpSpeed * Time.deltaTime, 0f, Space.World);
         }
 
+        // ENGEL KONTROLÜ
         Vector3 moveDirection = GetSeahorseForward();
         moveDirection.y = 0f;
         moveDirection.Normalize();
 
-        // HAREKET + KNOCKBACK
+        if (IsPathBlocked(moveDirection))
+        {
+            if (showDebug) Debug.Log("Engel tespit edildi! Hareket engellendi.");
+            return;
+        }
+
+        // DÜZELTME: Transform ile hareket (Rigidbody velocity yerine)
         Vector3 movement = moveDirection * swimSpeed * Time.deltaTime;
         Vector3 knockbackMovement = knockbackVelocity * Time.deltaTime;
 
+        // Transform pozisyonunu direkt değiştir
         transform.position += movement + knockbackMovement;
 
-        if (showDebug && Time.frameCount % 90 == 0)
+        // Zemin yüksekliğini koru
+        MaintainGroundHeight();
+    }
+
+    bool IsPathBlocked(Vector3 direction)
+    {
+        if (seahorseCollider == null) return false;
+
+        // Önünde engel var mı kontrol et
+        RaycastHit hit;
+        Vector3 rayStart = transform.position + Vector3.up * 0.5f;
+        float rayLength = obstacleCheckDistance;
+
+        if (Physics.Raycast(rayStart, direction, out hit, rayLength, obstacleLayers))
         {
-            Debug.Log($"🎯 Movement: {movement.magnitude:F2}, Knockback: {knockbackVelocity.magnitude:F2}");
+            // Player'ı engelleme
+            if (hit.collider.CompareTag("Player")) return false;
+
+            if (showDebug) Debug.Log($"Engel tespit edildi: {hit.collider.gameObject.name}");
+            return true;
         }
 
-        MaintainGroundHeight();
+        // Yanlarda da engel kontrolü
+        Vector3[] sideDirections = new Vector3[]
+        {
+            Quaternion.Euler(0, 30, 0) * direction,
+            Quaternion.Euler(0, -30, 0) * direction
+        };
+
+        foreach (Vector3 sideDir in sideDirections)
+        {
+            if (Physics.Raycast(rayStart, sideDir, out hit, rayLength * 0.7f, obstacleLayers))
+            {
+                if (!hit.collider.CompareTag("Player"))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     void MaintainGroundHeight()
@@ -233,20 +258,13 @@ public class SeahorseController : MonoBehaviour
             float targetY = hit.point.y - colliderBottomY + transform.position.y + groundOffset;
 
             Vector3 newPosition = new Vector3(transform.position.x, targetY, transform.position.z);
-            transform.position = Vector3.Lerp(transform.position, newPosition, Time.deltaTime * 2f);
+            transform.position = newPosition; // ✅ Direkt pozisyon ata
         }
     }
 
     void CheckMovementAndControlBubbles()
     {
-        bool wasMoving = isMoving;
-
         isMoving = isFollowing || knockbackVelocity.magnitude > 0.1f;
-
-        if (wasMoving != isMoving && showDebug)
-        {
-            Debug.Log($"🚀 Hareket durumu: {wasMoving} -> {isMoving}");
-        }
 
         if (bubbleParticleSystem != null)
         {
@@ -255,18 +273,12 @@ public class SeahorseController : MonoBehaviour
             if (isMoving)
             {
                 emissionModule.rateOverTime = bubbleEmissionRate;
-                if (!bubbleParticleSystem.isPlaying)
-                {
-                    bubbleParticleSystem.Play();
-                }
+                if (!bubbleParticleSystem.isPlaying) bubbleParticleSystem.Play();
             }
             else
             {
                 emissionModule.rateOverTime = 0;
-                if (bubbleParticleSystem.isPlaying)
-                {
-                    bubbleParticleSystem.Stop();
-                }
+                if (bubbleParticleSystem.isPlaying) bubbleParticleSystem.Stop();
             }
         }
     }
@@ -279,16 +291,60 @@ public class SeahorseController : MonoBehaviour
             direction.y = 0f;
             return direction;
         }
-
-        Vector3 forward = transform.forward;
-        forward.y = 0f;
-        return forward.normalized;
+        return transform.forward;
     }
 
-    // TRIGGER ILE Mermi yakalama
+    IEnumerator PerformAttack()
+    {
+        canAttack = false;
+
+        if (showDebug) Debug.Log($"🔥 Saldırı başlatılıyor! {babiesPerAttack} bebek fırlatılacak.");
+
+        for (int i = 0; i < babiesPerAttack; i++)
+        {
+            LaunchBabySeahorse();
+            yield return new WaitForSeconds(0.3f);
+        }
+
+        yield return new WaitForSeconds(attackCooldown);
+        canAttack = true;
+    }
+
+    void LaunchBabySeahorse()
+    {
+        if (babySeahorsePrefab == null || player == null) return;
+
+        Vector3 spawnPosition = transform.position + GetSeahorseForward() * 1f + Vector3.up * 0.5f;
+        GameObject baby = Instantiate(babySeahorsePrefab, spawnPosition, Quaternion.identity);
+
+        Vector3 playerTarget = player.position + Vector3.up * 1f;
+        Vector3 directionToPlayer = (playerTarget - spawnPosition).normalized;
+
+        Vector3 randomOffset = new Vector3(
+            Random.Range(-0.2f, 0.2f),
+            Random.Range(-0.1f, 0.1f),
+            Random.Range(-0.2f, 0.2f)
+        );
+
+        Vector3 finalDirection = (directionToPlayer + randomOffset).normalized;
+
+        BabySeahorse babyScript = baby.GetComponent<BabySeahorse>();
+        if (babyScript != null)
+        {
+            babyScript.Launch(finalDirection, babySpeed, babyDamage, babyLifetime);
+        }
+        else
+        {
+            Rigidbody rb = baby.GetComponent<Rigidbody>();
+            if (rb != null) rb.linearVelocity = finalDirection * babySpeed;
+        }
+
+        if (showDebug) Debug.Log($"👶 Küçük denizatı fırlatıldı!");
+    }
+
     void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("Bullet") || other.CompareTag("PlayerBullet"))
+        if (other.CompareTag("Bullet"))
         {
             Vector3 bulletDirection = (transform.position - other.transform.position).normalized;
             bulletDirection.y = 0f;
@@ -296,32 +352,51 @@ public class SeahorseController : MonoBehaviour
         }
     }
 
-    // Knockback uygulama
     void ApplyKnockback(Vector3 direction)
     {
         knockbackVelocity = direction.normalized * knockbackStrength;
-        if (showDebug) Debug.Log($"💥 Knockback uygulandı!");
+    }
+
+    void OnCollisionEnter(Collision collision)
+    {
+        // Duvarlarla çarpışma
+        if (((1 << collision.gameObject.layer) & obstacleLayers) != 0)
+        {
+            if (showDebug) Debug.Log($"Duvar ile çarpışma: {collision.gameObject.name}");
+
+            // Çarpışma anında knockback'i sıfırla
+            knockbackVelocity = Vector3.zero;
+        }
     }
 
     void OnDrawGizmos()
     {
         if (!alwaysShowGizmos && !showDebug) return;
 
-        // Collider'ı göster
-        if (seahorseCollider != null)
-        {
-            Gizmos.color = Color.cyan;
-            Gizmos.DrawWireCube(seahorseCollider.bounds.center, seahorseCollider.bounds.size);
-        }
-
-        // Knockback vektörünü göster
-        if (knockbackVelocity.magnitude > 0.1f)
-        {
-            Gizmos.color = Color.red;
-            Gizmos.DrawRay(transform.position, knockbackVelocity * 0.3f);
-        }
-
+        // Takip menzili
         Gizmos.color = isFollowing ? Color.red : Color.yellow;
         Gizmos.DrawWireSphere(transform.position, detectionRange);
+
+        // Saldırı menzili
+        Gizmos.color = Color.magenta;
+        Gizmos.DrawWireSphere(transform.position, attackRange);
+
+        // Engel kontrol çizgisi
+        Gizmos.color = Color.cyan;
+        Vector3 direction = GetSeahorseForward();
+        Gizmos.DrawRay(transform.position + Vector3.up * 0.5f, direction * obstacleCheckDistance);
+
+        // Yan kontrol çizgileri
+        Vector3[] sideDirections = new Vector3[]
+        {
+            Quaternion.Euler(0, 30, 0) * direction,
+            Quaternion.Euler(0, -30, 0) * direction
+        };
+
+        Gizmos.color = Color.blue;
+        foreach (Vector3 sideDir in sideDirections)
+        {
+            Gizmos.DrawRay(transform.position + Vector3.up * 0.5f, sideDir * obstacleCheckDistance * 0.7f);
+        }
     }
 }

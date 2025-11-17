@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class IsometricCameraController : MonoBehaviour
 {
@@ -11,9 +11,15 @@ public class IsometricCameraController : MonoBehaviour
 
     private Vector3 cameraVelocity = Vector3.zero;
 
+    // === SAHNE GEÇİŞİ İÇİN EKLENEN KOD ===
+    private static IsometricCameraController instance;
+
+   
+    // === EKLEME BURADA BİTTİ ===
+
     private void Start()
     {
-        // E�er target atanmam��sa, karakteri otomatik bul
+        // Eğer target atanmamışsa, karakteri otomatik bul
         if (target == null)
         {
             target = GameObject.FindGameObjectWithTag("Player").transform;
@@ -25,7 +31,7 @@ public class IsometricCameraController : MonoBehaviour
         }
         else
         {
-            Debug.LogError("Kamera i�in target bulunamad�! L�tfen karakteri 'Player' tag'i ile i�aretleyin veya manual olarak atay�n.");
+            Debug.LogError("Kamera için target bulunamadı! Lütfen karakteri 'Player' tag'i ile işaretleyin veya manual olarak atayın.");
         }
     }
 

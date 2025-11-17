@@ -1,114 +1,95 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class AutoBullet : MonoBehaviour
 {
     [Header("Bullet Settings")]
     public float damage = 10f;
-    public float bulletSpeed = 25f; // Daha h�zl�
+    public float bulletSpeed = 25f;
     public float bulletLifetime = 2f;
     public GameObject hitEffect;
 
     [Header("Knockback Settings")]
-    public float knockbackForce = 15f; // Daha g��l�
-
-    [Header("Bullet Visual")]
-    public Mesh bulletMesh;
-    public Material bulletMaterial;
-    public float bulletSize = 0.1f;
+    public float knockbackForce = 15f;
 
     private Vector3 direction;
     private Rigidbody rb;
     private bool hasHit = false;
-    private GameObject bulletVisual;
+    private bool useRigidbody = false;
 
     void Start()
     {
-        CreateBulletVisual();
-
         rb = GetComponent<Rigidbody>();
+
+        // RIGIDBODY KONTROLÜ - SADECE BİR TANESİNİ KULLAN
         if (rb != null)
         {
+            useRigidbody = true;
             rb.linearVelocity = direction * bulletSpeed;
+            Debug.Log($"🚀 Rigidbody Hızı: {rb.linearVelocity.magnitude}");
+        }
+        else
+        {
+            useRigidbody = false;
+            Debug.Log($"🚀 Transform Hareketi: {bulletSpeed}");
         }
 
         Destroy(gameObject, bulletLifetime);
     }
 
-    void CreateBulletVisual()
-    {
-        if (transform.childCount == 0)
-        {
-            bulletVisual = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            bulletVisual.transform.SetParent(transform);
-            bulletVisual.transform.localPosition = Vector3.zero;
-            bulletVisual.transform.localScale = Vector3.one * bulletSize;
-
-            Renderer renderer = bulletVisual.GetComponent<Renderer>();
-            if (bulletMaterial != null)
-            {
-                renderer.material = bulletMaterial;
-            }
-            else
-            {
-                renderer.material.color = Color.red;
-            }
-
-            Collider visualCollider = bulletVisual.GetComponent<Collider>();
-            if (visualCollider != null) Destroy(visualCollider);
-        }
-    }
-
-    public void Initialize(Vector3 dir)
+    public void Initialize(Vector3 dir, float speed, float bulletDamage)
     {
         direction = dir.normalized;
+        bulletSpeed = speed;
+        damage = bulletDamage;
         transform.forward = direction;
+
+        Debug.Log($"🎯 Mermi Başlatıldı: Speed={bulletSpeed}");
     }
 
     void Update()
     {
-        if (rb == null && !hasHit)
+        // RIGIDBODY YOKSA VEYA KİNETİK DEĞİLSE MANUEL HAREKET
+        if (!useRigidbody && !hasHit)
         {
             transform.position += direction * bulletSpeed * Time.deltaTime;
         }
     }
 
-    void OnTriggerEnter(Collider other)
+    void FixedUpdate()
     {
-        if (!other.CompareTag("Enemy")) return;
-
-        if (!hasHit)
+        // RIGIDBODY VARKEN VE KİNETİKSE BU KISMI KULLAN
+        if (useRigidbody && rb != null && !rb.isKinematic)
         {
-            hasHit = true;
-
-            EnemyHealth enemyHealth = other.GetComponent<EnemyHealth>();
-            if (enemyHealth != null)
-            {
-                // Merminin y�n�nde G��L� geri tepme uygula
-                enemyHealth.TakeDamage(damage, direction);
-            }
-            else
-            {
-                enemyHealth = other.GetComponentInParent<EnemyHealth>();
-                if (enemyHealth != null)
-                {
-                    enemyHealth.TakeDamage(damage, direction);
-                }
-            }
-
-            // �arpma efekti
-            if (hitEffect != null)
-            {
-                Instantiate(hitEffect, transform.position, Quaternion.identity);
-            }
-
-            Destroy(gameObject);
+            rb.linearVelocity = direction * bulletSpeed;
         }
     }
 
-    void OnDrawGizmos()
+    void OnTriggerEnter(Collider other)
     {
-        Gizmos.color = Color.red;
-        Gizmos.DrawLine(transform.position, transform.position + direction * 0.5f);
-        Gizmos.DrawWireSphere(transform.position, 0.05f);
+        if (hasHit || !other.CompareTag("Enemy")) return;
+
+        hasHit = true;
+
+        EnemyHealth enemyHealth = other.GetComponent<EnemyHealth>();
+        if (enemyHealth != null)
+        {
+            enemyHealth.TakeDamage(damage, direction);
+        }
+
+        if (hitEffect != null)
+        {
+            Instantiate(hitEffect, transform.position, Quaternion.identity);
+        }
+
+        Destroy(gameObject);
+    }
+
+    // TEST İÇİN: Inspector'da hızı değiştirince anında güncelle
+    void OnValidate()
+    {
+        if (Application.isPlaying && rb != null && useRigidbody)
+        {
+            rb.linearVelocity = direction * bulletSpeed;
+        }
     }
 }

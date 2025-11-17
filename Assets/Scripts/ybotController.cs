@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 
 public class ybotController : MonoBehaviour
 {
@@ -14,7 +15,7 @@ public class ybotController : MonoBehaviour
     [Header("Ground Check Settings")]
     public float groundCheckDistance = 0.3f;
     public LayerMask groundLayer = 1;
-    public string[] groundTags = { "Ground", "NoSpawnGround", "Platform" }; // Tüm ground tag'leri
+    public string[] groundTags = { "Ground", "NoSpawnGround", "Platform" };
 
     [Header("Debug")]
     public bool showGroundDebug = false;
@@ -27,43 +28,126 @@ public class ybotController : MonoBehaviour
     private bool isJumping = false;
     private bool jumpRequested = false;
 
+    // === SAHNE GEÇİŞİ İÇİN EKLENEN KOD ===
+    private static ybotController instance;
+
+    // === REWARD SİSTEM İÇİN EKLENEN KOD ===
+    private float baseWalkSpeed;
+    private float baseRunSpeed;
+    private float baseBackwardSpeed;
+    // === EKLEME BURADA BİTTİ ===
+
+
+
     private void Start()
     {
         ybotAnim = GetComponent<Animator>();
         rb = GetComponent<Rigidbody>();
 
-        // Rigidbody ayarları
-        rb.interpolation = RigidbodyInterpolation.Interpolate;
+        // === REWARD SİSTEM İÇİN EKLENEN KOD ===
+        baseWalkSpeed = walkSpeed;
+        baseRunSpeed = runSpeed;
+        baseBackwardSpeed = backwardSpeed;
+        // === EKLEME BURADA BİTTİ ===
 
-        // Karakteri "Player" tag'i ile işaretle
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
         gameObject.tag = "Player";
+
+        InitializeSceneSettings();
 
         if (showGroundDebug)
             Debug.Log("ybotController: Ground detection aktif!");
     }
 
+    private void InitializeSceneSettings()
+    {
+        if (SceneManager.GetActiveScene().name == "MainMenu")
+        {
+            Cursor.visible = true;
+            Cursor.lockState = CursorLockMode.None;
+            // MainMenu'de fizik ve hareketi durdur
+            if (rb != null) rb.isKinematic = true;
+            if (ybotAnim != null) ybotAnim.enabled = false;
+        }
+        else
+        {
+            Cursor.visible = false;
+            Cursor.lockState = CursorLockMode.Locked;
+            // Oyun sahnelerinde fizik ve hareketi aktif et
+            if (rb != null) rb.isKinematic = false;
+            if (ybotAnim != null) ybotAnim.enabled = true;
+        }
+    }
+
     private void Update()
     {
-        HandleMovement();
-
-        if (Keyboard.current.spaceKey.wasPressedThisFrame && isGrounded && !isJumping)
+        // Sadece SampleScene'de movement aktif (MainMenu değilse)
+        if (SceneManager.GetActiveScene().name != "MainMenu")
         {
-            jumpRequested = true;
+            // === REWARD SİSTEM İÇİN EKLENEN KOD ===
+            UpdateMovementSpeeds();
+            // === EKLEME BURADA BİTTİ ===
+
+            HandleMovement();
+
+            if (Keyboard.current.spaceKey.wasPressedThisFrame && isGrounded && !isJumping)
+            {
+                jumpRequested = true;
+            }
+
+            if (ybotAnim != null)
+            {
+                ybotAnim.SetBool("isGrounded", isGrounded);
+                ybotAnim.SetFloat("hiz", Mathf.InverseLerp(0, runSpeed, currentSpeed));
+                ybotAnim.SetBool("isJumping", isJumping);
+            }
         }
 
-        ybotAnim.SetBool("isGrounded", isGrounded);
-        ybotAnim.SetFloat("hiz", Mathf.InverseLerp(0, runSpeed, currentSpeed));
-        ybotAnim.SetBool("isJumping", isJumping);
+        // ESC tuşu kontrolü - sadece oyun sahnelerinde
+        if (Keyboard.current.escapeKey.wasPressedThisFrame && SceneManager.GetActiveScene().name != "MainMenu")
+        {
+            ToggleCursor();
+        }
     }
+
+    // === REWARD SİSTEM İÇİN EKLENEN METOD ===
+    private void UpdateMovementSpeeds()
+    {
+        if (PlayerStats.Instance != null)
+        {
+            float speedMultiplier = PlayerStats.Instance.GetMovementSpeedMultiplier();
+            walkSpeed = baseWalkSpeed * speedMultiplier;
+            runSpeed = baseRunSpeed * speedMultiplier;
+            backwardSpeed = baseBackwardSpeed * speedMultiplier;
+        }
+    }
+    // === EKLEME BURADA BİTTİ ===
 
     private void FixedUpdate()
     {
-        CheckGrounded();
-
-        if (jumpRequested && isGrounded && !isJumping)
+        if (SceneManager.GetActiveScene().name != "MainMenu")
         {
-            Jump();
-            jumpRequested = false;
+            CheckGrounded();
+
+            if (jumpRequested && isGrounded && !isJumping)
+            {
+                Jump();
+                jumpRequested = false;
+            }
+        }
+    }
+
+    private void ToggleCursor()
+    {
+        if (Cursor.visible)
+        {
+            Cursor.visible = false;
+            Cursor.lockState = CursorLockMode.Locked;
+        }
+        else
+        {
+            Cursor.visible = true;
+            Cursor.lockState = CursorLockMode.None;
         }
     }
 
@@ -72,20 +156,17 @@ public class ybotController : MonoBehaviour
         bool wasGrounded = isGrounded;
         isGrounded = false;
 
-        // 1. Raycast ile ground kontrolü (mevcut sistem)
         RaycastHit hit;
         Vector3 rayStart = transform.position + Vector3.up * 0.1f;
 
         if (Physics.Raycast(rayStart, Vector3.down, out hit, groundCheckDistance, groundLayer))
         {
-            // Tag kontrolü - tüm ground tag'lerini kabul et
             if (IsValidGroundTag(hit.collider.tag))
             {
                 isGrounded = true;
             }
         }
 
-        // 2. SphereCast ile daha geniş alan kontrolü (backup)
         if (!isGrounded)
         {
             if (Physics.SphereCast(rayStart, 0.2f, Vector3.down, out hit, groundCheckDistance, groundLayer))
@@ -97,7 +178,6 @@ public class ybotController : MonoBehaviour
             }
         }
 
-        // 3. Collision-based ground kontrolü (ekstra güvenlik)
         if (!isGrounded)
         {
             CheckGroundedByCollision();
@@ -126,7 +206,6 @@ public class ybotController : MonoBehaviour
 
     private void CheckGroundedByCollision()
     {
-        // Collision tabanlı ground kontrolü (physics-based)
         Collider[] colliders = Physics.OverlapBox(
             transform.position + Vector3.down * (groundCheckDistance * 0.5f),
             new Vector3(0.3f, groundCheckDistance * 0.5f, 0.3f),
@@ -138,11 +217,10 @@ public class ybotController : MonoBehaviour
         {
             if (IsValidGroundTag(col.tag))
             {
-                // Normal kontrolü - yukarı doğru yüzey mi?
                 RaycastHit normalHit;
                 if (Physics.Raycast(transform.position, Vector3.down, out normalHit, groundCheckDistance * 2f, groundLayer))
                 {
-                    if (Vector3.Dot(normalHit.normal, Vector3.up) > 0.7f) // 45 dereceden düz yüzey
+                    if (Vector3.Dot(normalHit.normal, Vector3.up) > 0.7f)
                     {
                         isGrounded = true;
                         break;
@@ -195,7 +273,9 @@ public class ybotController : MonoBehaviour
     {
         isJumping = true;
         isGrounded = false;
-        ybotAnim.SetBool("isJumping", true);
+        if (ybotAnim != null)
+            ybotAnim.SetBool("isJumping", true);
+
         rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
 
@@ -206,18 +286,13 @@ public class ybotController : MonoBehaviour
     {
         if (!showGroundDebug) return;
 
-        // Ground check görselleştirme
         Gizmos.color = isGrounded ? Color.green : Color.red;
-
-        // Raycast çizgisi
         Vector3 rayStart = transform.position + Vector3.up * 0.1f;
         Gizmos.DrawRay(rayStart, Vector3.down * groundCheckDistance);
 
-        // SphereCast alanı
         Gizmos.color = isGrounded ? new Color(0, 1, 0, 0.3f) : new Color(1, 0, 0, 0.3f);
         Gizmos.DrawWireSphere(rayStart + Vector3.down * groundCheckDistance, 0.2f);
 
-        // OverlapBox alanı
         Gizmos.color = Color.blue;
         Gizmos.DrawWireCube(
             transform.position + Vector3.down * (groundCheckDistance * 0.5f),

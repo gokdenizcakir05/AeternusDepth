@@ -53,15 +53,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 517adf4c99490584db9c6c328f0ed627, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 51.678314
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 517adf4c99490584db9c6c328f0ed627, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.00000047683716
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 517adf4c99490584db9c6c328f0ed627, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -18.624151
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 517adf4c99490584db9c6c328f0ed627, type: 3}
       propertyPath: m_LocalRotation.w
@@ -101,7 +101,7 @@ PrefabInstance:
       objectReference: {fileID: 2100000, guid: bdab08fb570f39342954821e39dd5a1c, type: 2}
     - target: {fileID: 919132149155446097, guid: 517adf4c99490584db9c6c328f0ed627, type: 3}
       propertyPath: m_Name
-      value: kirpi (3) 1
+      value: kirpis
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 517adf4c99490584db9c6c328f0ed627, type: 3}
       propertyPath: m_Layer
@@ -156,10 +156,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1ee1a3013e59cd548829d0c416a35e99, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RollingCharacter
-  moveSpeed: 5
+  moveSpeed: 10
   taklaSpeed: 180
   detectionRange: 15
   rotationLerpSpeed: 5
+  collisionDamage: 4
+  damageCooldown: 1
   frontPoint: {fileID: 2387471647612703130}
   showDebug: 0
 --- !u!135 &7809034146443715304

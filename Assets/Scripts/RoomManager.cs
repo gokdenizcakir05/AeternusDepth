@@ -202,6 +202,14 @@ public class RoomManager : MonoBehaviour
 
             GameObject chest = Instantiate(guaranteedChestPrefab, spawnPos, spawnRot);
 
+            // YENİ SATIR: Chest'e RoomManager referansı ver (isteğe bağlı)
+            ChestController chestController = chest.GetComponent<ChestController>();
+            if (chestController != null)
+            {
+                // ChestController artık otomatik oda ID'sini buluyor
+                if (showDebug) Debug.Log($"🎁 Chest odaya yerleştirildi: {roomName}");
+            }
+
             Debug.Log($"🎁 {roomName} TEMİZLENDİ! CHEST DÜŞTÜ! 🎉");
             Debug.Log($"📍 Pozisyon: {spawnPos}");
         }

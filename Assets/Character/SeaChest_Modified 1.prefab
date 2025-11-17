@@ -153,13 +153,16 @@ PrefabInstance:
       addedObject: {fileID: 5868033122539495717}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: f902cccdaf9ff3447a12183ecc113c96, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 8976290776127811187}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: f902cccdaf9ff3447a12183ecc113c96, type: 3}
-      insertIndex: -1
       addedObject: {fileID: 3277345903784955007}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: f902cccdaf9ff3447a12183ecc113c96, type: 3}
       insertIndex: -1
       addedObject: {fileID: 3195050728475389818}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: f902cccdaf9ff3447a12183ecc113c96, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8976290776127811187}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: f902cccdaf9ff3447a12183ecc113c96, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1984650471787064414}
   m_SourcePrefab: {fileID: 100100000, guid: f902cccdaf9ff3447a12183ecc113c96, type: 3}
 --- !u!1 &8189225265686020964 stripped
 GameObject:
@@ -184,25 +187,6 @@ Animation:
   m_AnimatePhysics: 0
   m_UpdateMode: 0
   m_CullingType: 0
---- !u!114 &8976290776127811187
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8189225265686020964}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 44752c52ecfdb4148a7be895004a805b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ChestController
-  interactionRange: 2
-  interactKey: 101
-  rewardPrefabs: []
-  minRewards: 1
-  maxRewards: 3
-  rewardSpawnRadius: 1.5
-  showDebug: 1
 --- !u!65 &3277345903784955007
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -251,3 +235,38 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
+--- !u!114 &8976290776127811187
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8189225265686020964}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 44752c52ecfdb4148a7be895004a805b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ChestController
+  interactionRange: 3
+  interactKey: 101
+  chestOpenDelay: 1
+  useUIRewardSystem: 1
+  doorAnimationTime: 1.5
+  door9PortalPrefab: {fileID: 8058721037066543581, guid: 05121f5a158ae86459b899450a682035, type: 3}
+  portalOffset: {x: 0, y: 0, z: 4}
+  showDebug: 1
+--- !u!114 &1984650471787064414
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8189225265686020964}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a2ebb5b2d2a0e624ba5da0ca38ea6170, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InteractableObject
+  interactionRange: 3
+  interactText: E BASINIZ
+  showDebug: 1

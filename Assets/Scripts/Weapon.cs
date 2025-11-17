@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using System.Collections;
 
 public class Weapon : MonoBehaviour
 {
@@ -11,6 +12,10 @@ public class Weapon : MonoBehaviour
     public string handBoneName = "RightHand";
     public Vector3 bonePosition = new Vector3(0.05f, 0.02f, 0.1f);
     public Vector3 boneRotation = new Vector3(0f, 0f, 0f);
+
+    [Header("Ünlem İşareti")]
+    public GameObject exclamationMark; // Ünlem işareti GameObject'i
+    public float blinkSpeed = 0.5f; // Yanıp sönme hızı
 
     [Header("Debug")]
     public bool showDebug = true;
@@ -28,6 +33,8 @@ public class Weapon : MonoBehaviour
     private Quaternion originalRotation;
     private Transform handBone;
     private AutoBulletShooter bulletShooter;
+    private InteractableObject interactableObject;
+    private bool isBlinking = false;
 
     void Start()
     {
@@ -35,6 +42,8 @@ public class Weapon : MonoBehaviour
         originalParent = transform.parent;
         originalPosition = transform.localPosition;
         originalRotation = transform.localRotation;
+
+        interactableObject = GetComponent<InteractableObject>();
 
         // AutoBulletShooter'ı bul
         bulletShooter = GetComponent<AutoBulletShooter>();
@@ -47,6 +56,9 @@ public class Weapon : MonoBehaviour
         {
             if (showDebug) Debug.LogError("AutoBulletShooter bulunamadı!");
         }
+
+        // OYUN BAŞLAR BAŞLAMAZ ÜNLEM YANIP SÖNSÜN
+        StartBlinking();
     }
 
     void FindPlayer()
@@ -83,9 +95,45 @@ public class Weapon : MonoBehaviour
         float distance = Vector3.Distance(transform.position, player.position);
         canPickup = distance <= pickupRadius;
 
+        // ESKİ ÜNLEM KONTROLÜNÜ KALDIRDIK - HER ZAMAN YANIP SÖNÜYOR
+
         if (canPickup && Input.GetKeyDown(pickupKey))
         {
             PickUpWeapon();
+        }
+    }
+
+    void StartBlinking()
+    {
+        if (exclamationMark == null) return;
+
+        isBlinking = true;
+        exclamationMark.SetActive(true);
+        StartCoroutine(BlinkExclamation());
+
+        if (showDebug) Debug.Log("🔔 Ünlem işareti başlatıldı!");
+    }
+
+    void StopBlinking()
+    {
+        if (exclamationMark == null) return;
+
+        isBlinking = false;
+        exclamationMark.SetActive(false);
+        StopAllCoroutines();
+
+        if (showDebug) Debug.Log("🔕 Ünlem işareti durduruldu!");
+    }
+
+    IEnumerator BlinkExclamation()
+    {
+        while (isBlinking)
+        {
+            if (exclamationMark != null)
+            {
+                exclamationMark.SetActive(!exclamationMark.activeSelf);
+            }
+            yield return new WaitForSeconds(blinkSpeed);
         }
     }
 
@@ -97,11 +145,27 @@ public class Weapon : MonoBehaviour
             return;
         }
 
+        // SİLAH ALINDIĞINDA ÜNLEM TAMAMEN YOK OLSUN
+        StopBlinking();
+
         handBone = FindHandBone();
         if (handBone == null)
         {
             Debug.LogError($"El kemiği bulunamadı: {handBoneName}");
             return;
+        }
+
+        // InteractableObject'ı devre dışı bırak
+        if (interactableObject != null)
+        {
+            interactableObject.enabled = false;
+            if (showDebug) Debug.Log("✅ InteractableObject devre dışı bırakıldı");
+
+            // UI'ı gizle
+            if (InteractUIManager.Instance != null)
+            {
+                InteractUIManager.Instance.HideInteractUI();
+            }
         }
 
         // Silahı el kemiğine bağla
@@ -149,6 +213,48 @@ public class Weapon : MonoBehaviour
             Debug.Log($"✅ {weaponName} {handBone.name} kemiğine bağlandı!");
             Debug.Log($"🔫 Silah durumu: isEquipped = {isEquipped}");
         }
+    }
+
+    public void DropWeapon()
+    {
+        if (!isEquipped) return;
+
+        transform.SetParent(originalParent);
+        transform.localPosition = originalPosition;
+        transform.localRotation = originalRotation;
+
+        // SİLAH BIRAKILDIĞINDA ÜNLEM TEKRAR BAŞLASIN
+        StartBlinking();
+
+        // InteractableObject'ı tekrar etkinleştir
+        if (interactableObject != null)
+        {
+            interactableObject.enabled = true;
+            if (showDebug) Debug.Log("✅ InteractableObject tekrar etkinleştirildi");
+        }
+
+        // AutoBulletShooter'ı devre dışı bırak
+        if (bulletShooter != null)
+        {
+            bulletShooter.enabled = false;
+            if (showDebug) Debug.Log("❌ AutoBulletShooter devre dışı bırakıldı!");
+        }
+
+        Rigidbody rb = GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.isKinematic = false;
+            rb.detectCollisions = true;
+        }
+
+        Collider collider = GetComponent<Collider>();
+        if (collider != null) collider.enabled = true;
+
+        isEquipped = false;
+        adjustMode = false;
+        handBone = null;
+
+        if (showDebug) Debug.Log("🗑️ Silah bırakıldı");
     }
 
     Transform FindHandBone()
@@ -220,38 +326,6 @@ public class Weapon : MonoBehaviour
         transform.localEulerAngles = boneRotation;
 
         Debug.Log($"Position: {bonePosition}, Rotation: {boneRotation}");
-    }
-
-    public void DropWeapon()
-    {
-        if (!isEquipped) return;
-
-        transform.SetParent(originalParent);
-        transform.localPosition = originalPosition;
-        transform.localRotation = originalRotation;
-
-        // AutoBulletShooter'ı devre dışı bırak
-        if (bulletShooter != null)
-        {
-            bulletShooter.enabled = false;
-            if (showDebug) Debug.Log("❌ AutoBulletShooter devre dışı bırakıldı!");
-        }
-
-        Rigidbody rb = GetComponent<Rigidbody>();
-        if (rb != null)
-        {
-            rb.isKinematic = false;
-            rb.detectCollisions = true;
-        }
-
-        Collider collider = GetComponent<Collider>();
-        if (collider != null) collider.enabled = true;
-
-        isEquipped = false;
-        adjustMode = false;
-        handBone = null;
-
-        if (showDebug) Debug.Log("🗑️ Silah bırakıldı");
     }
 
     void OnDrawGizmosSelected()

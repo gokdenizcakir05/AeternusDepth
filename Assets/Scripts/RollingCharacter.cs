@@ -8,6 +8,10 @@ public class RollingCharacter : MonoBehaviour
     public float detectionRange = 3f;    // Player'ı algılama mesafesi
     public float rotationLerpSpeed = 5f; // Player'a yönelme hızı
 
+    [Header("Combat Settings")]
+    public int collisionDamage = 10;     // Çarpışmada verilecek hasar
+    public float damageCooldown = 1f;    // Aynı player'a tekrar hasar verme süresi
+
     [Header("Face Direction")]
     public Transform frontPoint; // Ön tarafı belirleyen GameObject
 
@@ -17,6 +21,7 @@ public class RollingCharacter : MonoBehaviour
     private Transform player;
     private bool isFollowing = false;
     private Rigidbody rb;
+    private float lastDamageTime;        // Son hasar zamanı
 
     void Start()
     {
@@ -136,12 +141,19 @@ public class RollingCharacter : MonoBehaviour
         return transform.forward;
     }
 
-    // Çarpışma tespiti
+    // Çarpışma tespiti - HASAR EKLENDİ
     void OnCollisionEnter(Collision collision)
     {
         if (collision.gameObject.CompareTag("Player"))
         {
             if (showDebug) Debug.Log("RollingCharacter: Player'a çarptı!");
+
+            // Hasar verme
+            if (Time.time - lastDamageTime >= damageCooldown)
+            {
+                ApplyDamageToPlayer(collision.gameObject);
+                lastDamageTime = Time.time;
+            }
 
             // Çarpma sonrası hareketi durdur
             isFollowing = false;
@@ -152,6 +164,22 @@ public class RollingCharacter : MonoBehaviour
                 rb.linearVelocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
             }
+        }
+    }
+
+    // Player'a hasar verme metodu
+    void ApplyDamageToPlayer(GameObject playerObject)
+    {
+        // Player'ın health sistemine erişim
+        PlayerHealth playerHealth = playerObject.GetComponent<PlayerHealth>();
+        if (playerHealth != null)
+        {
+            playerHealth.TakeDamage(collisionDamage);
+            if (showDebug) Debug.Log($"RollingCharacter: Player'a {collisionDamage} hasar verildi!");
+        }
+        else
+        {
+            if (showDebug) Debug.LogWarning("RollingCharacter: Player'da PlayerHealth componenti bulunamadı!");
         }
     }
 
