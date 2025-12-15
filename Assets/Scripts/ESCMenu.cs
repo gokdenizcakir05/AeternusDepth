@@ -19,15 +19,15 @@ public class ESCMenu : MonoBehaviour
 
     void Start()
     {
-        Debug.Log("🚀 ESCMenu Start çalıştı");
+        Debug.Log("🚀 ESCMenu Start executed");
         if (escMenuPanel != null)
         {
             escMenuPanel.SetActive(false);
-            Debug.Log("✅ ESCMenu panel başlangıçta gizlendi");
+            Debug.Log("✅ ESCMenu panel hidden at start");
         }
         else
         {
-            Debug.LogError("❌ ESCMenu panel referansı boş!");
+            Debug.LogError("❌ ESCMenu panel reference is empty!");
         }
     }
 
@@ -41,14 +41,14 @@ public class ESCMenu : MonoBehaviour
 
         if (Input.GetKeyDown(toggleKey))
         {
-            Debug.Log("⌨️ ESC tuşuna basıldı");
+            Debug.Log("⌨️ ESC key pressed");
             ToggleMenu();
         }
     }
 
     public void ToggleMenu()
     {
-        Debug.Log("🔄 ToggleMenu çağrıldı, önceki durum: " + isMenuOpen);
+        Debug.Log("🔄 ToggleMenu called, previous state: " + isMenuOpen);
         isMenuOpen = !isMenuOpen;
 
         if (escMenuPanel != null)
@@ -57,7 +57,7 @@ public class ESCMenu : MonoBehaviour
 
             if (isMenuOpen)
             {
-                // TIMER'I DURDUR
+                // PAUSE TIMER
                 if (GameTimer.Instance != null)
                     GameTimer.Instance.PauseTimer();
 
@@ -65,33 +65,33 @@ public class ESCMenu : MonoBehaviour
                 Time.timeScale = 0f;
                 Cursor.visible = true;
                 Cursor.lockState = CursorLockMode.None;
-                Debug.Log("⏸️ Oyun duraklatıldı, fare aktif");
+                Debug.Log("⏸️ Game paused, mouse active");
             }
             else
             {
-                // TIMER'I DEVAM ETTIR
+                // RESUME TIMER
                 if (GameTimer.Instance != null)
                     GameTimer.Instance.ResumeTimer();
 
                 Time.timeScale = 1f;
                 Cursor.visible = false;
                 Cursor.lockState = CursorLockMode.Locked;
-                Debug.Log("▶️ Oyun devam ediyor, fare gizlendi");
+                Debug.Log("▶️ Game resumed, mouse hidden");
             }
         }
         else
         {
-            Debug.LogError("❌ ESCMenu panel referansı boş!");
+            Debug.LogError("❌ ESCMenu panel reference is empty!");
         }
     }
 
     void UpdateRewardsDisplay()
     {
-        Debug.Log("📊 UpdateRewardsDisplay çağrıldı");
+        Debug.Log("📊 UpdateRewardsDisplay called");
 
         if (rewardsText != null)
         {
-            rewardsText.text = "KAZANILAN GÜÇLENDİRMELER\n\n";
+            rewardsText.text = "ACQUIRED UPGRADES\n\n";
 
             if (PlayerStats.Instance != null)
             {
@@ -106,12 +106,12 @@ public class ESCMenu : MonoBehaviour
                 }
                 else
                 {
-                    rewardsText.text += "• Henüz güçlendirme kazanılmadı\n";
+                    rewardsText.text += "• No upgrades acquired yet\n";
                 }
             }
             else
             {
-                rewardsText.text += "• PlayerStats bulunamadı\n";
+                rewardsText.text += "• PlayerStats not found\n";
             }
         }
 
@@ -123,37 +123,37 @@ public class ESCMenu : MonoBehaviour
             }
             else
             {
-                totalStatsText.text = "İstatistikler yükleniyor...";
+                totalStatsText.text = "Loading statistics...";
             }
         }
 
-        Debug.Log("✅ Ödül görüntüsü güncellendi");
+        Debug.Log("✅ Rewards display updated");
     }
 
     public void ResumeGame()
     {
-        Debug.Log("🔘 DEVAM ET BUTONU ÇALIŞTI!");
+        Debug.Log("🔘 CONTINUE BUTTON WORKED!");
         ToggleMenu();
     }
 
     public void MainMenu()
     {
-        Debug.Log("🔘 ANA MENÜ BUTONU ÇALIŞTI!");
+        Debug.Log("🔘 MAIN MENU BUTTON WORKED!");
 
-        // TIMER'I DURDUR
+        // STOP TIMER
         if (GameTimer.Instance != null)
             GameTimer.Instance.StopTimer();
 
         Time.timeScale = 1f;
-        Debug.Log("⏰ Zaman normale döndürüldü");
+        Debug.Log("⏰ Time returned to normal");
 
-        Debug.Log("🏠 Ana menüye geçiliyor...");
+        Debug.Log("🏠 Switching to main menu...");
         SceneManager.LoadScene("MainMenu");
     }
 
     public void QuitGame()
     {
-        Debug.Log("🔘 ÇIKIŞ BUTONU ÇALIŞTI!");
+        Debug.Log("🔘 QUIT BUTTON WORKED!");
         Application.Quit();
 
 #if UNITY_EDITOR

@@ -20,6 +20,12 @@ public class BossHealth : MonoBehaviour
     public Color phase2Color = Color.yellow;
     public Color phase3Color = Color.magenta;
 
+    [Header("Death Settings")]
+    public GameObject deathEffectPrefab;
+    public float deathEffectDuration = 2f;
+    public bool destroyOnDeath = true;
+    public float destroyDelay = 0.1f;
+
     [Header("Debug")]
     public bool showDebug = true;
 
@@ -32,12 +38,12 @@ public class BossHealth : MonoBehaviour
     private float targetFillAmount = 1f;
     private float currentFillAmount = 1f;
     private float healthBarAnimationSpeed = 3f;
+    private bool isDead = false;
 
     void Start()
     {
         currentHealth = maxHealth;
         InitializeHealthBar();
-
         Debug.Log($"✅ BOSS HEALTH: Başlatıldı - {maxHealth} HP");
     }
 
@@ -108,15 +114,13 @@ public class BossHealth : MonoBehaviour
         {
             currentPhase = newPhase;
             OnPhaseChanged?.Invoke(currentPhase);
-
             if (showDebug) Debug.Log($"🔁 BOSS HEALTH: {currentPhase}. faza geçildi!");
         }
     }
 
-    // ORJİNAL METOD (int için)
     public void TakeDamage(int damage)
     {
-        if (currentHealth <= 0) return;
+        if (currentHealth <= 0 || isDead) return;
 
         int previousHealth = currentHealth;
         currentHealth -= damage;
@@ -124,38 +128,36 @@ public class BossHealth : MonoBehaviour
 
         if (showDebug)
         {
-            Debug.Log($"💥 BOSS HEALTH: {damage} hasar aldı! " +
-                     $"{previousHealth} -> {currentHealth} HP");
+            Debug.Log($"💥 BOSS HEALTH: {damage} hasar aldı! {previousHealth} -> {currentHealth} HP");
         }
 
         UpdateHealthBarUI();
         CheckPhase();
         OnDamageTaken?.Invoke(damage);
 
-        if (currentHealth <= 0)
+        if (currentHealth <= 0 && !isDead)
         {
             Die();
         }
     }
 
-    // YENİ METOD (float için - AutoBullet uyumluluğu)
     public void TakeDamage(float damageAmount)
     {
         int intDamage = Mathf.RoundToInt(damageAmount);
-        TakeDamage(intDamage); // Orjinal metodu çağır
-
+        TakeDamage(intDamage);
         if (showDebug) Debug.Log($"🔢 BOSS HEALTH: Float damage {damageAmount} -> int {intDamage}");
     }
 
     public void Heal(int healAmount)
     {
+        if (isDead) return;
+
         int previousHealth = currentHealth;
         currentHealth = Mathf.Min(currentHealth + healAmount, maxHealth);
 
         if (showDebug)
         {
-            Debug.Log($"❤️ BOSS HEALTH: {healAmount} can yenilendi! " +
-                     $"{previousHealth} -> {currentHealth} HP");
+            Debug.Log($"❤️ BOSS HEALTH: {healAmount} can yenilendi! {previousHealth} -> {currentHealth} HP");
         }
 
         UpdateHealthBarUI();
@@ -164,19 +166,43 @@ public class BossHealth : MonoBehaviour
 
     void Die()
     {
+        isDead = true;
+
         if (showDebug) Debug.Log("💀 BOSS HEALTH: Boss öldü!");
 
+        // Ölüm efekti
+        if (deathEffectPrefab != null)
+        {
+            GameObject effect = Instantiate(deathEffectPrefab, transform.position, transform.rotation);
+            Destroy(effect, deathEffectDuration);
+        }
+
+        // Event tetikle
         OnDeath?.Invoke();
 
+        // Health bar'ı gizle
         if (healthBarPanel != null)
         {
             healthBarPanel.SetActive(false);
+        }
+
+        // BossDeathSequence'i başlat
+        BossDeathSequence deathSequence = FindObjectOfType<BossDeathSequence>();
+        if (deathSequence != null)
+        {
+            deathSequence.StartDeathSequence();
+        }
+
+        // Boss'u yok et
+        if (destroyOnDeath)
+        {
+            Destroy(gameObject, destroyDelay);
         }
     }
 
     public void ShowHealthBar()
     {
-        if (healthBarPanel != null)
+        if (healthBarPanel != null && !isDead)
         {
             healthBarPanel.SetActive(true);
             Debug.Log("📊 BOSS HEALTH: Health bar gösterildi");
@@ -191,7 +217,6 @@ public class BossHealth : MonoBehaviour
         }
     }
 
-    // Yardımcı metodlar
     public float GetHealthPercentage()
     {
         return (float)currentHealth / maxHealth;
@@ -199,11 +224,11 @@ public class BossHealth : MonoBehaviour
 
     public bool IsAlive()
     {
-        return currentHealth > 0;
+        return currentHealth > 0 && !isDead;
     }
 
     public int GetCurrentPhase()
     {
         return currentPhase;
     }
-} 
+}

@@ -14,14 +14,16 @@ public class JellySlime : MonoBehaviour
     [Header("Face Direction")]
     public Transform frontPoint;
 
-    [Header("Player Trail Mound Settings")]
-    public bool enableTrailMounds = true;
-    public GameObject moundPrefab;
-    public float moundSpawnInterval = 3f;
-    public float moundDetectionRadius = 1.5f;
-    public float moundLifetime = 5f;
-    public int moundDamage = 10;
-    public LayerMask groundLayer = 1;
+    [Header("Combat Settings")]
+    public int bodySlamDamage = 15;
+    public float attackCooldown = 2f;
+
+    [Header("Split Settings")]
+    public bool enableSplit = true;
+    public GameObject miniSlimePrefab;
+    public int splitCount = 2;
+    public float miniSlimeMoveSpeed = 6f;
+    public int miniSlimeExplosionDamage = 20;
 
     [Header("Optimization Settings")]
     public float playerSearchInterval = 0.3f;
@@ -37,13 +39,14 @@ public class JellySlime : MonoBehaviour
     private Transform player;
     private bool isFollowing = false;
     private Rigidbody rb;
-    private float lastMoundSpawnTime;
     private Vector3 lastPlayerPosition;
     private float playerMoveThreshold = 0.5f;
 
     private float lastPlayerSearchTime;
     private float lastDistanceCheckTime;
     private float currentDistanceToPlayer;
+    private float lastAttackTime;
+    private EnemyHealth enemyHealth;
 
     void Start()
     {
@@ -62,8 +65,14 @@ public class JellySlime : MonoBehaviour
         rb.linearDamping = 2f;
         rb.angularDamping = 2f;
 
+        // EnemyHealth component'ini al
+        enemyHealth = GetComponent<EnemyHealth>();
+        if (enemyHealth != null)
+        {
+            enemyHealth.OnDeath += OnEnemyDeath;
+        }
+
         FindPlayer();
-        lastMoundSpawnTime = Time.time;
         lastPlayerSearchTime = Time.time;
         lastDistanceCheckTime = Time.time;
 
@@ -76,6 +85,8 @@ public class JellySlime : MonoBehaviour
 
     void Update()
     {
+        if (enemyHealth != null && enemyHealth.IsDead()) return;
+
         if (Time.time - lastPlayerSearchTime >= playerSearchInterval)
         {
             if (player == null)
@@ -111,12 +122,6 @@ public class JellySlime : MonoBehaviour
         if (isFollowing)
         {
             FollowPlayer();
-
-            if (enableTrailMounds && Time.time - lastMoundSpawnTime >= moundSpawnInterval)
-            {
-                TrySpawnMoundAtPlayerPosition();
-                lastMoundSpawnTime = Time.time;
-            }
         }
         else
         {
@@ -126,7 +131,87 @@ public class JellySlime : MonoBehaviour
         ApplyBounceAnimation();
     }
 
-    // DÜZELTİLDİ: PlayerMovement referansı kaldırıldı
+    void OnEnemyDeath(GameObject deadEnemy)
+    {
+        if (showDebug) Debug.Log("🔪 SLIME: EnemyHealth öldü! Bölünme kontrolü...");
+
+        if (enableSplit && miniSlimePrefab != null)
+        {
+            SplitIntoMiniSlimes();
+        }
+    }
+
+    void SplitIntoMiniSlimes()
+    {
+        for (int i = 0; i < splitCount; i++)
+        {
+            float angle = i * (360f / splitCount);
+            Vector3 spawnDir = Quaternion.Euler(0, angle, 0) * Vector3.forward;
+            Vector3 spawnPos = transform.position + spawnDir * 1f;
+
+            GameObject miniSlime = Instantiate(miniSlimePrefab, spawnPos, Quaternion.identity);
+
+            SetupMiniSlime(miniSlime);
+
+            if (showDebug) Debug.Log($"🔪 MINI SLIME {i + 1} oluşturuldu!");
+        }
+    }
+
+    void SetupMiniSlime(GameObject miniSlimeObj)
+    {
+        // SimpleSlimeController ekle
+        SimpleSlimeController controller = miniSlimeObj.GetComponent<SimpleSlimeController>();
+        if (controller == null)
+        {
+            controller = miniSlimeObj.AddComponent<SimpleSlimeController>();
+        }
+
+        // CONTROLLER AYARLARI - JELLYSLIME İLE AYNI
+        controller.moveSpeed = miniSlimeMoveSpeed;
+        controller.rotationLerpSpeed = 8f; // JELLYSLIME GİBİ
+        controller.stopDistance = 0.5f;
+        controller.explosionDamage = miniSlimeExplosionDamage;
+        controller.explosionTriggerDistance = 0.8f;
+
+        // FRONTPOINT'İ AYARLA - ÖNEMLİ!
+        if (controller.frontPoint == null)
+        {
+            // Mini slime'daki frontPoint'i bul
+            Transform miniFrontPoint = miniSlimeObj.transform.Find("FrontPoint");
+            if (miniFrontPoint != null)
+            {
+                controller.frontPoint = miniFrontPoint;
+            }
+        }
+
+        // JellySlime'ı kapat
+        JellySlime jellyScript = miniSlimeObj.GetComponent<JellySlime>();
+        if (jellyScript != null)
+        {
+            jellyScript.enabled = false;
+        }
+
+        // Görsel ayarlar
+        miniSlimeObj.transform.localScale = transform.localScale * 0.6f;
+
+        // EnemyHealth ayarı
+        EnemyHealth miniHealth = miniSlimeObj.GetComponent<EnemyHealth>();
+        if (miniHealth != null)
+        {
+            miniHealth.maxHealth = 5f;
+        }
+
+        Debug.Log("✅ Mini slime JellySlime gibi ayarlandı!");
+    }
+
+    void OnDestroy()
+    {
+        if (enemyHealth != null)
+        {
+            enemyHealth.OnDeath -= OnEnemyDeath;
+        }
+    }
+
     void FindPlayer()
     {
         GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
@@ -137,7 +222,6 @@ public class JellySlime : MonoBehaviour
             return;
         }
 
-        // Fallback: Sadece isimle ara (PlayerMovement olmadan)
         if (player == null)
         {
             playerObj = GameObject.Find("Player");
@@ -177,62 +261,6 @@ public class JellySlime : MonoBehaviour
         }
     }
 
-    void TrySpawnMoundAtPlayerPosition()
-    {
-        if (moundPrefab == null || player == null) return;
-
-        float playerMoveDistance = Vector3.Distance(player.position, lastPlayerPosition);
-        if (playerMoveDistance < playerMoveThreshold) return;
-
-        Vector3 spawnPosition = GetPlayerGroundPosition();
-        if (!IsValidSpawnPosition(spawnPosition)) return;
-        if (IsPositionOccupied(spawnPosition)) return;
-
-        SpawnMoundAtPosition(spawnPosition);
-        lastPlayerPosition = player.position;
-    }
-
-    Vector3 GetPlayerGroundPosition()
-    {
-        Vector3 playerPos = player.position;
-
-        RaycastHit hit;
-        if (Physics.Raycast(playerPos + Vector3.up * 1f, Vector3.down, out hit, 3f, groundLayer))
-        {
-            return hit.point + Vector3.up * 0.1f;
-        }
-
-        return new Vector3(playerPos.x, playerPos.y - 0.5f, playerPos.z);
-    }
-
-    void SpawnMoundAtPosition(Vector3 position)
-    {
-        GameObject mound = Instantiate(moundPrefab, position, Quaternion.identity);
-        DamageMound moundScript = mound.GetComponent<DamageMound>();
-        if (moundScript == null)
-        {
-            moundScript = mound.AddComponent<DamageMound>();
-        }
-        moundScript.SetupMound(moundDamage, moundLifetime, moundDetectionRadius);
-    }
-
-    bool IsPositionOccupied(Vector3 position)
-    {
-        Collider[] colliders = Physics.OverlapSphere(position, 0.3f);
-        foreach (Collider collider in colliders)
-        {
-            if (collider.GetComponent<DamageMound>() != null) return true;
-        }
-        return false;
-    }
-
-    bool IsValidSpawnPosition(Vector3 position)
-    {
-        if (!Physics.Raycast(position + Vector3.up * 0.5f, Vector3.down, 1.5f, groundLayer)) return false;
-        if (Vector3.Distance(position, transform.position) > detectionRange * 1.5f) return false;
-        return true;
-    }
-
     void NormalAnimation()
     {
         float time = Time.time + timeOffset;
@@ -258,9 +286,21 @@ public class JellySlime : MonoBehaviour
 
     void OnCollisionEnter(Collision collision)
     {
+        if (enemyHealth != null && enemyHealth.IsDead()) return;
+
         if (collision.gameObject.CompareTag("Player"))
         {
-            if (showDebug) Debug.Log("Slime: Player'a çarptı!");
+            if (Time.time - lastAttackTime >= attackCooldown)
+            {
+                PlayerHealth playerHealth = collision.gameObject.GetComponent<PlayerHealth>();
+                if (playerHealth != null)
+                {
+                    playerHealth.TakeDamage(bodySlamDamage);
+                    if (showDebug) Debug.Log($"💥 SLIME: Çarpma saldırısı! {bodySlamDamage} hasar!");
+                }
+                lastAttackTime = Time.time;
+            }
+
             isFollowing = false;
             if (rb != null) rb.linearVelocity = Vector3.zero;
         }

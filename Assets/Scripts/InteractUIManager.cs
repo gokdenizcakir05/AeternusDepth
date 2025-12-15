@@ -7,8 +7,8 @@ public class InteractUIManager : MonoBehaviour
     public GameObject interactPanel;
     public TextMeshProUGUI interactText;
 
-    [Header("Settings")]
-    public string defaultText = "E Basýnýz";
+    // SABÝT METÝN - DEÐÝÞTÝRÝLEMEZ
+    private const string INTERACT_TEXT = "Press E";
 
     private InteractableObject currentInteractable;
     private bool isUIVisible = false;
@@ -29,14 +29,16 @@ public class InteractUIManager : MonoBehaviour
 
     void Start()
     {
+        // BAÞLANGIÇTA METNÝ AYARLA
+        if (interactText != null)
+        {
+            interactText.text = INTERACT_TEXT;
+        }
         HideInteractUI();
     }
 
     public void ShowInteractUI(InteractableObject interactable, string customText = "")
     {
-        // ÖNCE HER ZAMAN GÝZLE
-        HideInteractUI();
-
         if (interactable == null) return;
 
         currentInteractable = interactable;
@@ -48,7 +50,9 @@ public class InteractUIManager : MonoBehaviour
 
             if (interactText != null)
             {
-                interactText.text = string.IsNullOrEmpty(customText) ? defaultText : customText;
+                // HER ZAMAN AYNI METÝN
+                interactText.text = INTERACT_TEXT;
+                Debug.Log("Text set to: " + interactText.text);
             }
         }
     }
@@ -63,7 +67,6 @@ public class InteractUIManager : MonoBehaviour
         }
     }
 
-    // BU METODU EKLE!
     public void HideInteractUIForObject(InteractableObject interactable)
     {
         if (currentInteractable == interactable)
@@ -79,15 +82,5 @@ public class InteractUIManager : MonoBehaviour
             currentInteractable.OnInteract();
             HideInteractUI();
         }
-    }
-
-    public bool IsUIVisible()
-    {
-        return isUIVisible;
-    }
-
-    public InteractableObject GetCurrentInteractable()
-    {
-        return currentInteractable;
     }
 }

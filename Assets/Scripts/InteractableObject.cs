@@ -4,7 +4,7 @@ public class InteractableObject : MonoBehaviour
 {
     [Header("Interaction Settings")]
     public float interactionRange = 3f;
-    public string interactText = "E Basınız";
+    public string interactText = "Press E";
     public bool showDebug = true;
 
     private Transform player;

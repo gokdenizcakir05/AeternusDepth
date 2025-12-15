@@ -12,13 +12,24 @@ public class ybotController : MonoBehaviour
     public float acceleration = 5f;
     public float jumpForce = 5f;
 
+    [Header("Hover Mode Settings")]
+    public float hoverHeight = 0.2f;
+    public float hoverForce = 10f;
+    public float hoverSpeedMultiplier = 1.5f;
+    public float hoverBobSpeed = 3f;
+    public float hoverBobAmount = 0.05f;
+    public float hoverEnergyDrainRate = 5f;
+    public float hoverEnergyRegenRate = 3f;
+    public float maxHoverEnergy = 100f;
+
+    [Header("Effects")]
+    public GameObject hoverBubblePrefab; // ARTIK PREFAB!
+    public Transform bubbleSpawnPoint;
+
     [Header("Ground Check Settings")]
     public float groundCheckDistance = 0.3f;
     public LayerMask groundLayer = 1;
     public string[] groundTags = { "Ground", "NoSpawnGround", "Platform" };
-
-    [Header("Debug")]
-    public bool showGroundDebug = false;
 
     private Animator ybotAnim;
     private Rigidbody rb;
@@ -28,16 +39,20 @@ public class ybotController : MonoBehaviour
     private bool isJumping = false;
     private bool jumpRequested = false;
 
-    // === SAHNE GEÇİŞİ İÇİN EKLENEN KOD ===
-    private static ybotController instance;
+    // Hover Mode değişkenleri
+    private bool isHovering = false;
+    private bool hoverRequested = false;
+    private float currentHoverEnergy;
+    private Vector3 hoverStartPosition;
+    private bool canHover = true;
+    private float hoverBobTimer = 0f;
+    private GameObject currentBubbleInstance; // Sahnedeki particle instance
 
     // === REWARD SİSTEM İÇİN EKLENEN KOD ===
     private float baseWalkSpeed;
     private float baseRunSpeed;
     private float baseBackwardSpeed;
     // === EKLEME BURADA BİTTİ ===
-
-
 
     private void Start()
     {
@@ -53,10 +68,10 @@ public class ybotController : MonoBehaviour
         rb.interpolation = RigidbodyInterpolation.Interpolate;
         gameObject.tag = "Player";
 
-        InitializeSceneSettings();
+        // Hover enerjisini başlat
+        currentHoverEnergy = maxHoverEnergy;
 
-        if (showGroundDebug)
-            Debug.Log("ybotController: Ground detection aktif!");
+        InitializeSceneSettings();
     }
 
     private void InitializeSceneSettings()
@@ -65,7 +80,6 @@ public class ybotController : MonoBehaviour
         {
             Cursor.visible = true;
             Cursor.lockState = CursorLockMode.None;
-            // MainMenu'de fizik ve hareketi durdur
             if (rb != null) rb.isKinematic = true;
             if (ybotAnim != null) ybotAnim.enabled = false;
         }
@@ -73,7 +87,6 @@ public class ybotController : MonoBehaviour
         {
             Cursor.visible = false;
             Cursor.lockState = CursorLockMode.Locked;
-            // Oyun sahnelerinde fizik ve hareketi aktif et
             if (rb != null) rb.isKinematic = false;
             if (ybotAnim != null) ybotAnim.enabled = true;
         }
@@ -81,16 +94,43 @@ public class ybotController : MonoBehaviour
 
     private void Update()
     {
-        // Sadece SampleScene'de movement aktif (MainMenu değilse)
         if (SceneManager.GetActiveScene().name != "MainMenu")
         {
-            // === REWARD SİSTEM İÇİN EKLENEN KOD ===
             UpdateMovementSpeeds();
-            // === EKLEME BURADA BİTTİ ===
+            HandleMovementInput();
 
-            HandleMovement();
+            // Hover için Shift'e basılı tut
+            if (Keyboard.current.leftShiftKey.isPressed && canHover && currentHoverEnergy > 10f && isGrounded && !isHovering)
+            {
+                hoverRequested = true;
+            }
 
-            if (Keyboard.current.spaceKey.wasPressedThisFrame && isGrounded && !isJumping)
+            if (Keyboard.current.leftShiftKey.wasReleasedThisFrame && isHovering)
+            {
+                StopHover();
+            }
+
+            // Hover enerjisi yenileme
+            if (!isHovering && currentHoverEnergy < maxHoverEnergy)
+            {
+                currentHoverEnergy += hoverEnergyRegenRate * Time.deltaTime;
+                currentHoverEnergy = Mathf.Clamp(currentHoverEnergy, 0, maxHoverEnergy);
+            }
+
+            // Hover bob timer
+            if (isHovering)
+            {
+                hoverBobTimer += Time.deltaTime * hoverBobSpeed;
+
+                // Particle instance'ı spawn point'te tut
+                if (currentBubbleInstance != null && bubbleSpawnPoint != null)
+                {
+                    currentBubbleInstance.transform.position = bubbleSpawnPoint.position;
+                    currentBubbleInstance.transform.rotation = bubbleSpawnPoint.rotation;
+                }
+            }
+
+            if (Keyboard.current.spaceKey.wasPressedThisFrame && isGrounded && !isJumping && !isHovering)
             {
                 jumpRequested = true;
             }
@@ -98,16 +138,15 @@ public class ybotController : MonoBehaviour
             if (ybotAnim != null)
             {
                 ybotAnim.SetBool("isGrounded", isGrounded);
-                ybotAnim.SetFloat("hiz", Mathf.InverseLerp(0, runSpeed, currentSpeed));
+                ybotAnim.SetFloat("hiz", isHovering ?
+                    Mathf.InverseLerp(0, walkSpeed, currentSpeed) :
+                    Mathf.InverseLerp(0, runSpeed, currentSpeed));
                 ybotAnim.SetBool("isJumping", isJumping);
+                ybotAnim.SetBool("isHovering", isHovering);
             }
         }
-
-        
-       
     }
 
-    // === REWARD SİSTEM İÇİN EKLENEN METOD ===
     private void UpdateMovementSpeeds()
     {
         if (PlayerStats.Instance != null)
@@ -118,7 +157,6 @@ public class ybotController : MonoBehaviour
             backwardSpeed = baseBackwardSpeed * speedMultiplier;
         }
     }
-    // === EKLEME BURADA BİTTİ ===
 
     private void FixedUpdate()
     {
@@ -126,68 +164,217 @@ public class ybotController : MonoBehaviour
         {
             CheckGrounded();
 
-            if (jumpRequested && isGrounded && !isJumping)
+            if (hoverRequested && isGrounded && canHover && currentHoverEnergy > 10f)
+            {
+                StartHover();
+                hoverRequested = false;
+            }
+
+            if (isHovering)
+            {
+                HandleHover();
+
+                currentHoverEnergy -= hoverEnergyDrainRate * Time.deltaTime;
+                if (currentHoverEnergy <= 0)
+                {
+                    currentHoverEnergy = 0;
+                    StopHover();
+                }
+            }
+
+            if (jumpRequested && isGrounded && !isJumping && !isHovering)
             {
                 Jump();
                 jumpRequested = false;
             }
+
+            if (!isHovering)
+            {
+                HandleMovement();
+            }
         }
     }
 
-    private void ToggleCursor()
+    private void StartHover()
     {
-        if (Cursor.visible)
+        isHovering = true;
+        isJumping = false;
+        hoverStartPosition = transform.position + Vector3.up * hoverHeight;
+
+        rb.useGravity = false;
+        rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+        transform.position = hoverStartPosition;
+
+        // PREFAB'DAN PARTICLE INSTANCE OLUŞTUR
+        if (hoverBubblePrefab != null && bubbleSpawnPoint != null)
         {
-            Cursor.visible = false;
-            Cursor.lockState = CursorLockMode.Locked;
+            // Eski instance varsa temizle
+            if (currentBubbleInstance != null)
+            {
+                Destroy(currentBubbleInstance);
+            }
+
+            // Yeni instance oluştur
+            currentBubbleInstance = Instantiate(
+                hoverBubblePrefab,
+                bubbleSpawnPoint.position,
+                bubbleSpawnPoint.rotation
+            );
+
+            // Particle System component'ini bul ve başlat
+            ParticleSystem particleSystem = currentBubbleInstance.GetComponent<ParticleSystem>();
+            if (particleSystem != null)
+            {
+                particleSystem.Play();
+            }
+
+            Debug.Log($"Hover başladı! Particle oluşturuldu: {currentBubbleInstance.name}");
         }
         else
         {
-            Cursor.visible = true;
-            Cursor.lockState = CursorLockMode.None;
+            Debug.LogWarning($"HoverBubblePrefab veya SpawnPoint NULL! Prefab: {hoverBubblePrefab != null}, SpawnPoint: {bubbleSpawnPoint != null}");
         }
+    }
+
+    private void HandleHover()
+    {
+        float bobOffset = Mathf.Sin(hoverBobTimer) * hoverBobAmount;
+        Vector3 targetPosition = new Vector3(
+            transform.position.x,
+            hoverStartPosition.y + bobOffset,
+            transform.position.z
+        );
+
+        Vector3 positionDifference = targetPosition - transform.position;
+        rb.AddForce(positionDifference * hoverForce, ForceMode.Acceleration);
+
+        HandleMovement();
+
+        Vector3 horizontalVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+        if (horizontalVelocity.magnitude > walkSpeed * hoverSpeedMultiplier)
+        {
+            horizontalVelocity = horizontalVelocity.normalized * walkSpeed * hoverSpeedMultiplier;
+            rb.linearVelocity = new Vector3(horizontalVelocity.x, rb.linearVelocity.y, horizontalVelocity.z);
+        }
+    }
+
+    private void StopHover()
+    {
+        isHovering = false;
+        rb.useGravity = true;
+
+        // Particle instance'ı temizle
+        if (currentBubbleInstance != null)
+        {
+            // Particle'ı yavaşça durdur
+            ParticleSystem particleSystem = currentBubbleInstance.GetComponent<ParticleSystem>();
+            if (particleSystem != null)
+            {
+                particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+            }
+
+            // 2 saniye sonra yok et (particle'ın bitmesini bekle)
+            Destroy(currentBubbleInstance, 2f);
+            currentBubbleInstance = null;
+        }
+    }
+
+    private void HandleMovementInput()
+    {
+        bool forward = Keyboard.current.wKey.isPressed;
+        bool backward = Keyboard.current.sKey.isPressed;
+        bool left = Keyboard.current.aKey.isPressed;
+        bool right = Keyboard.current.dKey.isPressed;
+
+        Vector3 direction = Vector3.zero;
+        if (forward) direction += Vector3.forward;
+        if (backward) direction += Vector3.back;
+        if (left) direction += Vector3.left;
+        if (right) direction += Vector3.right;
+        direction.Normalize();
+
+        if (direction.magnitude > 0)
+        {
+            targetSpeed = isHovering ?
+                walkSpeed * hoverSpeedMultiplier :
+                (backward ? backwardSpeed : walkSpeed);
+        }
+        else
+        {
+            targetSpeed = 0f;
+        }
+
+        currentSpeed = Mathf.Lerp(currentSpeed, targetSpeed, Time.deltaTime * acceleration);
+    }
+
+    private void HandleMovement()
+    {
+        bool forward = Keyboard.current.wKey.isPressed;
+        bool backward = Keyboard.current.sKey.isPressed;
+        bool left = Keyboard.current.aKey.isPressed;
+        bool right = Keyboard.current.dKey.isPressed;
+
+        Vector3 direction = Vector3.zero;
+        if (forward) direction += Vector3.forward;
+        if (backward) direction += Vector3.back;
+        if (left) direction += Vector3.left;
+        if (right) direction += Vector3.right;
+        direction.Normalize();
+
+        if (direction != Vector3.zero)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(direction, Vector3.up);
+            transform.rotation = Quaternion.Lerp(transform.rotation, targetRotation, Time.deltaTime * rotationSmooth);
+        }
+
+        Vector3 moveDirection = transform.forward * currentSpeed * Time.deltaTime;
+        rb.MovePosition(rb.position + moveDirection);
     }
 
     private void CheckGrounded()
     {
         bool wasGrounded = isGrounded;
-        isGrounded = false;
 
-        RaycastHit hit;
-        Vector3 rayStart = transform.position + Vector3.up * 0.1f;
-
-        if (Physics.Raycast(rayStart, Vector3.down, out hit, groundCheckDistance, groundLayer))
+        if (!isHovering)
         {
-            if (IsValidGroundTag(hit.collider.tag))
-            {
-                isGrounded = true;
-            }
-        }
+            isGrounded = false;
 
-        if (!isGrounded)
-        {
-            if (Physics.SphereCast(rayStart, 0.2f, Vector3.down, out hit, groundCheckDistance, groundLayer))
+            RaycastHit hit;
+            Vector3 rayStart = transform.position + Vector3.up * 0.1f;
+
+            if (Physics.Raycast(rayStart, Vector3.down, out hit, groundCheckDistance, groundLayer))
             {
                 if (IsValidGroundTag(hit.collider.tag))
                 {
                     isGrounded = true;
                 }
             }
-        }
 
-        if (!isGrounded)
-        {
-            CheckGroundedByCollision();
-        }
+            if (!isGrounded)
+            {
+                if (Physics.SphereCast(rayStart, 0.2f, Vector3.down, out hit, groundCheckDistance, groundLayer))
+                {
+                    if (IsValidGroundTag(hit.collider.tag))
+                    {
+                        isGrounded = true;
+                    }
+                }
+            }
 
-        if (isGrounded && !wasGrounded)
+            if (!isGrounded)
+            {
+                CheckGroundedByCollision();
+            }
+
+            if (isGrounded && !wasGrounded)
+            {
+                isJumping = false;
+            }
+        }
+        else
         {
+            isGrounded = true;
             isJumping = false;
-            if (showGroundDebug) Debug.Log("ybot: Grounded!");
-        }
-        else if (!isGrounded && wasGrounded)
-        {
-            if (showGroundDebug) Debug.Log("ybot: In Air!");
         }
     }
 
@@ -227,45 +414,6 @@ public class ybotController : MonoBehaviour
         }
     }
 
-    private void HandleMovement()
-    {
-        bool forward = Keyboard.current.wKey.isPressed;
-        bool backward = Keyboard.current.sKey.isPressed;
-        bool left = Keyboard.current.aKey.isPressed;
-        bool right = Keyboard.current.dKey.isPressed;
-        bool run = Keyboard.current.leftShiftKey.isPressed;
-
-        Vector3 direction = Vector3.zero;
-        if (forward) direction += Vector3.forward;
-        if (backward) direction += Vector3.back;
-        if (left) direction += Vector3.left;
-        if (right) direction += Vector3.right;
-        direction.Normalize();
-
-        if (direction.magnitude > 0)
-        {
-            if (run)
-                targetSpeed = runSpeed;
-            else if (backward)
-                targetSpeed = backwardSpeed;
-            else
-                targetSpeed = walkSpeed;
-        }
-        else
-            targetSpeed = 0f;
-
-        currentSpeed = Mathf.Lerp(currentSpeed, targetSpeed, Time.deltaTime * acceleration);
-
-        if (direction != Vector3.zero)
-        {
-            Quaternion targetRotation = Quaternion.LookRotation(direction, Vector3.up);
-            transform.rotation = Quaternion.Lerp(transform.rotation, targetRotation, Time.deltaTime * rotationSmooth);
-        }
-
-        Vector3 moveDirection = transform.forward * currentSpeed * Time.deltaTime;
-        rb.MovePosition(rb.position + moveDirection);
-    }
-
     private void Jump()
     {
         isJumping = true;
@@ -275,25 +423,15 @@ public class ybotController : MonoBehaviour
 
         rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
-
-        if (showGroundDebug) Debug.Log("ybot: Jump!");
     }
 
-    private void OnDrawGizmosSelected()
+    public float GetHoverEnergyPercentage()
     {
-        if (!showGroundDebug) return;
+        return currentHoverEnergy / maxHoverEnergy;
+    }
 
-        Gizmos.color = isGrounded ? Color.green : Color.red;
-        Vector3 rayStart = transform.position + Vector3.up * 0.1f;
-        Gizmos.DrawRay(rayStart, Vector3.down * groundCheckDistance);
-
-        Gizmos.color = isGrounded ? new Color(0, 1, 0, 0.3f) : new Color(1, 0, 0, 0.3f);
-        Gizmos.DrawWireSphere(rayStart + Vector3.down * groundCheckDistance, 0.2f);
-
-        Gizmos.color = Color.blue;
-        Gizmos.DrawWireCube(
-            transform.position + Vector3.down * (groundCheckDistance * 0.5f),
-            new Vector3(0.6f, groundCheckDistance, 0.6f)
-        );
+    public bool IsHovering()
+    {
+        return isHovering;
     }
 }

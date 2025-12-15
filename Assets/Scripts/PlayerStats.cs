@@ -51,32 +51,32 @@ public class PlayerStats : MonoBehaviour
     public float CurrentBulletSpeedBonus => _currentBulletSpeedBonus;
     public float CurrentDamageBonus => _currentDamageBonus;
 
-    // AWAKE METODU EKSİK! EKLEYELİM:
+    // AWAKE METHOD WAS MISSING! LET'S ADD IT:
     void Awake()
     {
         if (Instance == null)
         {
             Instance = this;
-            // DontDestroyOnLoad YOK - sadece Instance ataması
+            // No DontDestroyOnLoad - only Instance assignment
         }
         else
         {
             Destroy(gameObject);
         }
 
-        Debug.Log("✅ PlayerStats Awake çalıştı - Instance atandı");
+        Debug.Log("✅ PlayerStats Awake executed - Instance assigned");
     }
 
     void Start()
     {
-        Debug.Log("🎯 PlayerStats Start çalıştı - Bonuslar sıfırlandı");
+        Debug.Log("🎯 PlayerStats Start executed - Bonuses reset to zero");
     }
 
     public void ApplyReward(RewardItem reward)
     {
-        Debug.Log($"🔍 Ödül uygulanıyor: {reward.rewardName} - Value: {reward.value} - FloatValue: {reward.floatValue}");
+        Debug.Log($"🔍 Applying reward: {reward.rewardName} - Value: {reward.value} - FloatValue: {reward.floatValue}");
 
-        // Ödülü kazanılanlar listesine ekle
+        // Add reward to acquired list
         string rewardDisplay = $"{reward.rewardName}";
         if (reward.value > 0) rewardDisplay += $" +{reward.value}";
         if (reward.floatValue > 0) rewardDisplay += $" +%{reward.floatValue}";
@@ -88,31 +88,31 @@ public class PlayerStats : MonoBehaviour
             case RewardType.Health:
                 maxHealthBonus += reward.value;
                 UpdatePlayerHealth(reward.value);
-                Debug.Log($"💧 Maksimum Oksijen +{reward.value} (Toplam Bonus: {maxHealthBonus})");
+                Debug.Log($"💧 Maximum Oxygen +{reward.value} (Total Bonus: {maxHealthBonus})");
                 break;
 
             case RewardType.MovementSpeed:
                 movementSpeedBonus += reward.floatValue;
                 _currentMovementSpeedBonus = movementSpeedBonus;
-                Debug.Log($"🏃 Hareket Hızı +%{reward.floatValue} (Toplam: %{movementSpeedBonus})");
+                Debug.Log($"🏃 Movement Speed +%{reward.floatValue} (Total: %{movementSpeedBonus})");
                 break;
 
             case RewardType.AttackSpeed:
                 attackSpeedBonus += reward.floatValue;
                 _currentAttackSpeedBonus = attackSpeedBonus;
-                Debug.Log($"⚡ Saldırı Hızı +%{reward.floatValue} (Toplam: %{attackSpeedBonus})");
+                Debug.Log($"⚡ Attack Speed +%{reward.floatValue} (Total: %{attackSpeedBonus})");
                 break;
 
             case RewardType.BulletSpeed:
                 bulletSpeedBonus += reward.floatValue;
                 _currentBulletSpeedBonus = bulletSpeedBonus;
-                Debug.Log($"💨 Mermi Hızı +%{reward.floatValue} (Toplam: %{bulletSpeedBonus})");
+                Debug.Log($"💨 Bullet Speed +%{reward.floatValue} (Total: %{bulletSpeedBonus})");
                 break;
 
             case RewardType.Damage:
                 damageBonus += reward.floatValue;
                 _currentDamageBonus = damageBonus;
-                Debug.Log($"💥 Hasar +%{reward.floatValue} (Toplam: %{damageBonus}, Çarpan: {GetDamageMultiplier()})");
+                Debug.Log($"💥 Damage +%{reward.floatValue} (Total: %{damageBonus}, Multiplier: {GetDamageMultiplier()})");
                 break;
         }
 
@@ -125,11 +125,11 @@ public class PlayerStats : MonoBehaviour
         if (playerHealth != null)
         {
             playerHealth.AddMaxHealth(newBonus);
-            Debug.Log($"❤️ PlayerHealth'e +{newBonus} bonus can eklendi");
+            Debug.Log($"❤️ +{newBonus} bonus health added to PlayerHealth");
         }
         else
         {
-            Debug.LogWarning("❌ PlayerHealth bulunamadı!");
+            Debug.LogWarning("❌ PlayerHealth not found!");
         }
     }
 
@@ -163,7 +163,7 @@ public class PlayerStats : MonoBehaviour
         return 100 + maxHealthBonus;
     }
 
-    // ESC Menüsü için metodlar
+    // ESC Menu methods
     public List<string> GetAllAcquiredRewards()
     {
         if (acquiredRewards == null)
@@ -175,12 +175,12 @@ public class PlayerStats : MonoBehaviour
 
     public string GetTotalStatsSummary()
     {
-        string summary = "TOPLAM İSTATİSTİKLER\n\n";
-        summary += $"🏃 Hareket Hızı: +%{movementSpeedBonus:F1}\n\n";
-        summary += $"⚡ Saldırı Hızı: +%{attackSpeedBonus:F1}\n\n";
-        summary += $"💨 Mermi Hızı: +%{bulletSpeedBonus:F1}\n\n";
-        summary += $"💥 Hasar: +%{damageBonus:F1}\n\n";
-        summary += $"💧 Oksijen Bonusu: +{maxHealthBonus}";
+        string summary = "TOTAL STATISTICS\n\n";
+        summary += $"🏃 Movement Speed: +%{movementSpeedBonus:F1}\n\n";
+        summary += $"⚡ Attack Speed: +%{attackSpeedBonus:F1}\n\n";
+        summary += $"💨 Bullet Speed: +%{bulletSpeedBonus:F1}\n\n";
+        summary += $"💥 Damage: +%{damageBonus:F1}\n\n";
+        summary += $"💧 Oxygen Bonus: +{maxHealthBonus}";
 
         return summary;
     }
@@ -188,15 +188,15 @@ public class PlayerStats : MonoBehaviour
     public void DebugStats()
     {
         Debug.Log($"🎯 PLAYER STATS DEBUG:");
-        Debug.Log($"💥 Hasar Bonusu: %{damageBonus} (Çarpan: {GetDamageMultiplier()})");
-        Debug.Log($"💨 Mermi Hızı Bonusu: %{bulletSpeedBonus} (Çarpan: {GetBulletSpeedMultiplier()})");
-        Debug.Log($"⚡ Saldırı Hızı Bonusu: %{attackSpeedBonus} (Çarpan: {GetAttackSpeedMultiplier()})");
-        Debug.Log($"🏃 Hareket Hızı Bonusu: %{movementSpeedBonus} (Çarpan: {GetMovementSpeedMultiplier()})");
-        Debug.Log($"💧 Oksijen Bonusu: +{maxHealthBonus}");
-        Debug.Log($"📊 Toplam Kazanılan Ödül: {acquiredRewards.Count}");
+        Debug.Log($"💥 Damage Bonus: %{damageBonus} (Multiplier: {GetDamageMultiplier()})");
+        Debug.Log($"💨 Bullet Speed Bonus: %{bulletSpeedBonus} (Multiplier: {GetBulletSpeedMultiplier()})");
+        Debug.Log($"⚡ Attack Speed Bonus: %{attackSpeedBonus} (Multiplier: {GetAttackSpeedMultiplier()})");
+        Debug.Log($"🏃 Movement Speed Bonus: %{movementSpeedBonus} (Multiplier: {GetMovementSpeedMultiplier()})");
+        Debug.Log($"💧 Oxygen Bonus: +{maxHealthBonus}");
+        Debug.Log($"📊 Total Acquired Rewards: {acquiredRewards.Count}");
     }
 
-    // Reset metodu - restart için
+    // Reset method - for restart
     public void ResetStats()
     {
         movementSpeedBonus = 0f;
@@ -206,6 +206,6 @@ public class PlayerStats : MonoBehaviour
         maxHealthBonus = 0;
         acquiredRewards.Clear();
 
-        Debug.Log("🔄 PlayerStats resetlendi");
+        Debug.Log("🔄 PlayerStats reset");
     }
 }

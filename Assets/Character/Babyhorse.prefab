@@ -91,6 +91,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 202fe2045d0ff7645b7503964aa813bd, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: d51d6ea7f5c9363439264a4fbaca8cff, type: 2}
     - target: {fileID: 919132149155446097, guid: 202fe2045d0ff7645b7503964aa813bd, type: 3}
       propertyPath: m_Name
       value: Babyhorse
