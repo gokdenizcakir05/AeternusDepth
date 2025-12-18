@@ -1552,12 +1552,18 @@ MonoBehaviour:
   settingsButton: {fileID: 0}
   creditsButton: {fileID: 178048356}
   exitButton: {fileID: 2093332364}
+  gameTitleText: {fileID: 0}
   creditsPanel: {fileID: 1472520010}
   creditsText: {fileID: 1884483260}
   closeCreditsButton: {fileID: 0}
   scrollSpeed: 200
   gameSceneName: SampleScene
-  buttonClickSound: {fileID: 0}
+  buttonClickSound: {fileID: 8300000, guid: 061cf398b5d52ac42832904dae83e295, type: 3}
+  buttonHoverSound: {fileID: 0}
+  hoverScaleAmount: 1.1
+  animationSpeed: 10
+  titleFloatSpeed: 1
+  titleFloatAmount: 30
 --- !u!4 &2052227067
 Transform:
   m_ObjectHideFlags: 0
@@ -1691,7 +1697,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -2, y: -137}
+  m_AnchoredPosition: {x: -2, y: -150}
   m_SizeDelta: {x: 399.6948, y: 105}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1660057539 &9223372036854775807

@@ -46,14 +46,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4183d94481f26f439b910d9cd3f7090, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CthulhuGroundExplosion
-  damage: 20
-  radius: 3
+  damage: 10
+  damageRadiusMultiplier: 0.9
   lifetime: 4
-  bubbleDuration: 1
-  bubbleMaxScale: 3
+  bubbleDuration: 1.7
+  bubbleMaxScale: 1.8
+  pulseSpeed: 2
+  warningIntensity: 1.5
   bubbleWarning: {fileID: 9091365014767525520}
   explosionEffect: {fileID: 6660074086270171097}
   warningParticles: {fileID: 0}
+  damageDelay: 0.1
+  activeDamageTime: 0.2
+  showDebugGizmos: 1
 --- !u!1 &6660074086270171097
 GameObject:
   m_ObjectHideFlags: 0

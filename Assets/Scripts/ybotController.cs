@@ -21,6 +21,7 @@ public class ybotController : MonoBehaviour
     public float hoverEnergyDrainRate = 5f;
     public float hoverEnergyRegenRate = 3f;
     public float maxHoverEnergy = 100f;
+    public float hoverTiltAngle = 10f; // X ekseninde eğilme açısı eklendi
 
     [Header("Effects")]
     public GameObject hoverBubblePrefab; // ARTIK PREFAB!
@@ -138,9 +139,18 @@ public class ybotController : MonoBehaviour
             if (ybotAnim != null)
             {
                 ybotAnim.SetBool("isGrounded", isGrounded);
-                ybotAnim.SetFloat("hiz", isHovering ?
-                    Mathf.InverseLerp(0, walkSpeed, currentSpeed) :
-                    Mathf.InverseLerp(0, runSpeed, currentSpeed));
+
+                // Hover modunda DEĞİLSE yürüme animasyonu olsun
+                if (!isHovering)
+                {
+                    ybotAnim.SetFloat("hiz", Mathf.InverseLerp(0, runSpeed, currentSpeed));
+                }
+                // Hover modunda ise animasyon olmasın (0 değeri)
+                else
+                {
+                    ybotAnim.SetFloat("hiz", 0f);
+                }
+
                 ybotAnim.SetBool("isJumping", isJumping);
                 ybotAnim.SetBool("isHovering", isHovering);
             }
@@ -256,12 +266,22 @@ public class ybotController : MonoBehaviour
             horizontalVelocity = horizontalVelocity.normalized * walkSpeed * hoverSpeedMultiplier;
             rb.linearVelocity = new Vector3(horizontalVelocity.x, rb.linearVelocity.y, horizontalVelocity.z);
         }
+
+        // Karakterin baktığı yöne göre eğilme (local X ekseninde)
+        Quaternion currentRotation = transform.rotation;
+        Quaternion targetTilt = Quaternion.Euler(hoverTiltAngle, currentRotation.eulerAngles.y, currentRotation.eulerAngles.z);
+        transform.rotation = Quaternion.Lerp(currentRotation, targetTilt, Time.fixedDeltaTime * rotationSmooth);
     }
 
     private void StopHover()
     {
         isHovering = false;
         rb.useGravity = true;
+
+        // Rotation'ı sıfırla (X eksenini 0 yap)
+        Quaternion currentRotation = transform.rotation;
+        Quaternion targetRotation = Quaternion.Euler(0f, currentRotation.eulerAngles.y, currentRotation.eulerAngles.z);
+        transform.rotation = targetRotation;
 
         // Particle instance'ı temizle
         if (currentBubbleInstance != null)
@@ -324,7 +344,22 @@ public class ybotController : MonoBehaviour
         if (direction != Vector3.zero)
         {
             Quaternion targetRotation = Quaternion.LookRotation(direction, Vector3.up);
-            transform.rotation = Quaternion.Lerp(transform.rotation, targetRotation, Time.deltaTime * rotationSmooth);
+
+            // Hover modunda değilken normal dönüş
+            if (!isHovering)
+            {
+                // X eksenini sıfırlayarak düz dönüş yap
+                Quaternion currentRot = transform.rotation;
+                Quaternion flatRotation = Quaternion.Euler(0f, targetRotation.eulerAngles.y, 0f);
+                transform.rotation = Quaternion.Lerp(currentRot, flatRotation, Time.deltaTime * rotationSmooth);
+            }
+            // Hover modundayken sadece Y ekseninde dön, X ekseni eğilmesini koru
+            else
+            {
+                Quaternion currentRot = transform.rotation;
+                Quaternion newRotation = Quaternion.Euler(currentRot.eulerAngles.x, targetRotation.eulerAngles.y, currentRot.eulerAngles.z);
+                transform.rotation = Quaternion.Lerp(currentRot, newRotation, Time.deltaTime * rotationSmooth);
+            }
         }
 
         Vector3 moveDirection = transform.forward * currentSpeed * Time.deltaTime;
