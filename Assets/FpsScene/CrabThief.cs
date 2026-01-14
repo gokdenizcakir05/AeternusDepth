@@ -49,6 +49,9 @@ public class CrabThief : MonoBehaviour
     private bool isPatrolling = false;
     private bool isWaiting = false;
 
+    // Yeni değişken: Player tüm relic'leri topladı mı?
+    private bool allRelicsCollectedByPlayer = false;
+
     private int targetRelicID = -1;
     private Vector3 targetPosition;
     private Vector3 patrolTargetPoint;
@@ -70,6 +73,17 @@ public class CrabThief : MonoBehaviour
 
     void Update()
     {
+        // 0. PLAYER'IN TÜM RELIC'LERİ TOPLAYIP TOPLAMADIĞINI KONTROL ET
+        CheckIfAllRelicsCollected();
+
+        // Eğer player tüm relic'leri topladıysa, tarama ve çalma yapma
+        if (allRelicsCollectedByPlayer)
+        {
+            // Sadece normal dolaşmaya devam et
+            HandleNormalPatrol();
+            return;
+        }
+
         // 1. TARAMA COOLDOWN'U KONTROL ET
         if (Time.time - lastScanTime >= scanCooldown && !isScanning && !isMovingToPlayer && !isMovingToHidingSpot && !isWaiting)
         {
@@ -79,21 +93,7 @@ public class CrabThief : MonoBehaviour
         // 2. NORMAL DOLAŞMA (TARAMA YOKKEN)
         if (!isScanning && !isMovingToPlayer && !isMovingToHidingSpot && !isWaiting)
         {
-            // Belirli aralıklarla rastgele noktaya git
-            if (Time.time - lastRandomMoveTime >= randomMoveFrequency)
-            {
-                SetRandomPatrolPoint();
-                lastRandomMoveTime = Time.time;
-            }
-
-            // Hedef noktaya doğru hareket et
-            MoveToTarget(patrolTargetPoint);
-
-            // Hedefe ulaştıysa bekle
-            if (Vector3.Distance(transform.position, patrolTargetPoint) <= 1f && !isWaiting)
-            {
-                StartCoroutine(WaitAtPoint());
-            }
+            HandleNormalPatrol();
         }
 
         // 3. OYUNCUYA HAREKET (ÇALMA MODU)
@@ -118,6 +118,56 @@ public class CrabThief : MonoBehaviour
             {
                 DropRelicAndReset();
             }
+        }
+    }
+
+    void CheckIfAllRelicsCollected()
+    {
+        if (relicManager == null) return;
+
+        // Eğer player tüm relic'leri bulduysa (5 relic var varsayıyoruz)
+        int totalRelics = 5; // Toplam relic sayısı
+        int collectedCount = 0;
+
+        for (int i = 0; i < totalRelics; i++)
+        {
+            if (relicManager.IsRelicFound(i))
+            {
+                collectedCount++;
+            }
+        }
+
+        bool previouslyAllCollected = allRelicsCollectedByPlayer;
+        allRelicsCollectedByPlayer = (collectedCount >= totalRelics);
+
+        // Durum değiştiyse log göster
+        if (allRelicsCollectedByPlayer && !previouslyAllCollected)
+        {
+            Debug.Log("🎉 Player tüm relic'leri topladı! Yengeç taramayı durduruyor...");
+            ResetAll();
+        }
+        else if (!allRelicsCollectedByPlayer && previouslyAllCollected)
+        {
+            Debug.Log("🦀 Player relic kaybetti! Yengeç tekrar aktif...");
+        }
+    }
+
+    void HandleNormalPatrol()
+    {
+        // Belirli aralıklarla rastgele noktaya git
+        if (Time.time - lastRandomMoveTime >= randomMoveFrequency)
+        {
+            SetRandomPatrolPoint();
+            lastRandomMoveTime = Time.time;
+        }
+
+        // Hedef noktaya doğru hareket et
+        MoveToTarget(patrolTargetPoint);
+
+        // Hedefe ulaştıysa bekle
+        if (Vector3.Distance(transform.position, patrolTargetPoint) <= 1f && !isWaiting)
+        {
+            StartCoroutine(WaitAtPoint());
         }
     }
 
@@ -170,6 +220,14 @@ public class CrabThief : MonoBehaviour
         isScanning = true;
         Debug.Log("🦀 Tarama başladı...");
 
+        // Player tüm relic'leri topladıysa tarama yapma
+        if (allRelicsCollectedByPlayer)
+        {
+            Debug.Log("🦀 Player tüm relic'leri topladığı için tarama iptal!");
+            ResetScan();
+            return;
+        }
+
         // Çalma cooldown'u kontrol et
         if (Time.time - lastStealTime < stealCooldown)
         {
@@ -207,6 +265,14 @@ public class CrabThief : MonoBehaviour
 
     void TrySteal()
     {
+        // Player tüm relic'leri topladıysa çalma yapma
+        if (allRelicsCollectedByPlayer)
+        {
+            Debug.Log("🦀 Player tüm relic'leri topladığı için çalma iptal!");
+            ResetAll();
+            return;
+        }
+
         // Çalma cooldown'u kontrol et
         if (Time.time - lastStealTime < stealCooldown)
         {
@@ -233,6 +299,14 @@ public class CrabThief : MonoBehaviour
 
     void StealRelic()
     {
+        // Player tüm relic'leri topladıysa çalma yapma
+        if (allRelicsCollectedByPlayer)
+        {
+            Debug.Log("🦀 Player tüm relic'leri topladığı için çalma iptal!");
+            ResetAll();
+            return;
+        }
+
         // RelicManager'dan sil
         if (relicManager != null)
         {
@@ -275,6 +349,14 @@ public class CrabThief : MonoBehaviour
 
     void DropRelicAndReset()
     {
+        // Player tüm relic'leri topladıysa relic bırakma
+        if (allRelicsCollectedByPlayer)
+        {
+            Debug.Log("🦀 Player tüm relic'leri topladığı için relic bırakılmadı!");
+            ResetAll();
+            return;
+        }
+
         // Prefab spawn et
         if (stolenRelicPrefabs != null && targetRelicID >= 0 && targetRelicID < stolenRelicPrefabs.Length)
         {
@@ -444,6 +526,7 @@ public class CrabThief : MonoBehaviour
     void DebugStatus()
     {
         Debug.Log("=== 🦀 DURUM ===");
+        Debug.Log("Tüm relic'ler toplandı mı: " + allRelicsCollectedByPlayer);
         Debug.Log("Tarama cooldown: " + (Time.time - lastScanTime).ToString("F1") + "/" + scanCooldown + "s");
         Debug.Log("Çalma cooldown: " + (Time.time - lastStealTime).ToString("F1") + "/" + stealCooldown + "s");
         Debug.Log("Oyuncuya gidiyor: " + isMovingToPlayer);
